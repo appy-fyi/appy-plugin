@@ -1,0 +1,7 @@
+{
+  "name": "build-from-spec-plugin",
+  "private": true,
+  "optionalDependencies": {
+    "sharp": "^0.35.3"
+  }
+}

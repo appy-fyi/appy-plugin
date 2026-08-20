@@ -1,0 +1,13 @@
+{
+  "name": "build-from-spec-plugin",
+  "owner": {
+    "name": "Gilad Kutiel"
+  },
+  "plugins": [
+    {
+      "name": "build-from-spec-plugin",
+      "source": "./",
+      "description": "Build a complete native Android app end-to-end from a self-contained build-spec.json, including a deterministic, always-present launcher icon."
+    }
+  ]
+}
