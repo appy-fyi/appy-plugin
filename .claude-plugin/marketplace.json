@@ -1,5 +1,6 @@
 {
   "name": "build-from-spec-plugin",
+  "description": "Build a complete native Android app from appy.fyi's build-spec.json, with deterministic launcher-icon generation.",
   "owner": {
     "name": "Gilad Kutiel"
   },

@@ -1,6 +1,6 @@
 {
   "name": "build-from-spec-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Build a complete native Android app end-to-end from a self-contained build-spec.json, including a deterministic, always-present launcher icon — no external image-gen tool required.",
   "author": {
     "name": "Gilad Kutiel"
