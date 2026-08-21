@@ -8,9 +8,14 @@ download produces.
 Bundles:
 - The `build-from-spec` skill — scaffolds the Gradle/Compose project,
   implements every screen/feature/data-model entity exactly as specified,
-  writes the test plan as real tests, and stops cleanly at the human-only
-  gates (trademark clearance, privacy-claim verification, Play Console
-  publishing).
+  writes the test plan as real tests, wires in the Google Play In-App Review
+  and Play Integrity client APIs, and — once the developer has completed the
+  one-time Play Console/Cloud setup the skill walks them through step by
+  step — uses the Google Play Developer API itself to upload the build to
+  internal testing and create the billing product(s). It still stops cleanly
+  at the true human-only gates (trademark clearance, privacy-claim
+  verification, Play Console account creation/content declarations, and
+  promotion to production).
 - `scripts/genLauncherIcon.ts` — deterministic Android adaptive-icon
   generation from the spec's `design_system` tokens. No AI image-gen tool
   required, no placeholder ever shipped. The default (API 26+) path has zero

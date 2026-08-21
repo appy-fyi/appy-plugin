@@ -1,6 +1,6 @@
 ---
 name: build-from-spec
-description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, and stops cleanly at the human-only gates (trademark clearance, privacy-claim verification, Play Console publishing) instead of guessing past them.
+description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, wires in the Google Play In-App Review and Play Integrity client APIs, and — once the developer has completed the one-time Play Console/Cloud setup this skill walks them through step by step — calls the Google Play Developer API itself to upload the build to internal testing and create the billing product(s). It still stops cleanly at the true human-only gates (trademark clearance, privacy-claim verification, Play Console account creation/content declarations, and promotion to production) instead of guessing past them.
 allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/genLauncherIcon.ts *)
 ---
 
@@ -21,7 +21,7 @@ start scaffolding off a partial read. If more than one matches, ask which.
 Note the `<play_id>` prefix of the filename itself (it matches the
 `/report/:play_id/build-spec.json` path this file was downloaded from) — this
 is the *incumbent's* play_id, used only as `origin_play_id` in the `ownership`
-call below and the three GET endpoints. §6's confirmation links use
+call below and the three GET endpoints. §7's confirmation links use
 `package_id` (this app's own id) instead, not this filename prefix.
 
 The JSON has this shape (all fields always present):
@@ -55,10 +55,10 @@ The JSON has this shape (all fields always present):
   convey that. The other four — `endpoints.privacy_policy`,
   `endpoints.app_page`, `endpoints.app_page_icon`, and
   `endpoints.app_page_screenshot` — are POSTs, scoped to `package_id` (this
-  app, not the incumbent), all used at the very end of the build, in §6.
+  app, not the incumbent), all used at the very end of the build, in §7.
 - `working_name`, `package_id`, `positioning`, `non_goals[]` — what to build
   and its explicit scope boundary. `trademark_cleared: false` always — see
-  §6.
+  §7.
 - `tech_stack` — `kotlin_version`, `compose_bom_version`, `gradle_version`,
   and `libraries[]` (`purpose`, `gradle_coordinate`) — pinned, real versions.
   Use exactly these, don't substitute "latest."
@@ -92,7 +92,7 @@ The JSON has this shape (all fields always present):
   `steps[]`, `expected` — steps are written to be transcribed directly into
   a test function.
 - `build_instructions` — literal shell commands to build, test, and sign.
-- `human_gates_required[]` — see §6.
+- `human_gates_required[]` — see §7.
 
 ## 1. Scaffold the project
 
@@ -173,18 +173,59 @@ the incumbent's.
 If `sharp` is available, also call this plugin's exported
 `genLegacyLauncherPngs(design_system)` (`${CLAUDE_PLUGIN_ROOT}/scripts/genLauncherIcon.ts`)
 to get a flat, rasterized version of the same deterministic icon — its
-`mipmap-xxxhdpi/ic_launcher.png` entry (192×192) is what §6 uploads as the
+`mipmap-xxxhdpi/ic_launcher.png` entry (192×192) is what §7 uploads as the
 appy.fyi app_page's icon, regardless of whether this project's own `min_sdk`
 needs the `--legacy` mipmaps for itself. If `sharp` errors or is missing,
-skip the app_page icon upload in §6 the same way `--legacy` already
+skip the app_page icon upload in §7 the same way `--legacy` already
 tolerates its absence — never treat it as a build blocker.
 
-## 6. Stop at the human gates — don't build past them
+## 6. Play Store readiness (client-side, no gate)
+
+Two Google Play client libraries get added to every app this skill builds,
+regardless of whether `tech_stack.libraries[]` lists them — like the launcher
+icon in §5, these are baseline infrastructure every Play Store app needs, not
+app-specific scope, so treat them as exempt from §1's "nothing speculative"
+rule rather than skipping them for not being named in the spec:
+
+- **In-App Review API** (`com.google.android.play:review-ktx`) — resolve the
+  current stable version from Google's Maven repo
+  (`maven.google.com`/`dl.google.com/android/maven2`) at build time rather
+  than trust a hardcoded number here, since this plugin file doesn't move on
+  Google's release cadence. Wire a single `ReviewManagerFactory` helper and
+  call it from one natural, positive pause point in the app's flow — e.g.
+  right after a `features[]` entry's `acceptance_criteria` describes a
+  successful completion of the app's core action, never on first launch or
+  right after an error state. The real Play API is quota-limited server-side
+  and doesn't guarantee the dialog actually shows even when requested — don't
+  build any app logic that assumes it did.
+- **Play Integrity API** (`com.google.android.play:integrity`) — only add
+  this when `backend` is `"firebase"` **and** `pricing` is present (i.e.
+  there's both a server to verify a token against and a purchased
+  entitlement worth protecting). A client-only integrity check with no
+  server-side verification is security theater — it adds surface without
+  adding protection — so skip it entirely when `backend` is `"none"`, and say
+  so in the final report rather than silently omitting it. When it applies:
+  request an integrity token client-side right before granting the purchased
+  entitlement, and verify it server-side in the same Firebase Cloud Function
+  described in §7's Purchases API section, using the same service-account
+  credentials set up there. Never decode or trust an integrity verdict
+  on-device — that defeats the point of the API.
+
+Note in the final report (§9) which of these two got added, and — if the
+Integrity API was skipped because `backend` is `"none"` — say so explicitly
+rather than leaving it unmentioned.
+
+## 7. Stop at the human gates — don't build past them
 
 `trademark_cleared: false` and `legal.privacy_policy_accurate: false` are
-not placeholders waiting for a value you can fill in — they're the two
+not placeholders waiting for a value you can fill in — they're two
 checkpoints appy.fyi's build-spec pipeline deliberately leaves for a human.
-Concretely, that means:
+Play Console account creation and its content declarations are a third —
+see the walkthrough below. Uploading a build to internal testing and
+creating the billing product(s), however, are *not* human-only anymore:
+once the developer has completed that walkthrough's one-time manual setup,
+you call the Google Play Developer API yourself for those. Concretely, that
+means:
 
 - Write the code, write a real Room/EncryptedSharedPreferences
   implementation, write a real privacy policy *page* using
@@ -237,15 +278,135 @@ Concretely, that means:
   placeholder store/key passwords in `build_instructions` as needing to be
   replaced with real secrets before any real release — don't silently ship
   the sample password.
-- Do **not** attempt to create a Play Console account, register the app,
-  configure billing products, or upload anything anywhere. That whole
-  category of action is out of scope for this skill regardless of how far
-  the CLI tooling could technically go.
+
+### Google Play Developer API: manual setup, then automated publishing
+
+Creating the Play Console account itself, creating the app shell, and
+answering Play's content declarations cannot be done by an agent — they
+require a human to pass identity verification, accept legal declarations,
+and pay a one-time fee. Everything past that point — uploading the build to
+internal testing, writing the store listing, and creating billing
+product(s) — you can and should do yourself via the Google Play Developer
+API (`androidpublisher` v3), once the developer hands you working
+credentials. Walk the developer through this exactly once, step by step,
+before touching any of it — don't assume they already know these steps:
+
+1. **Play Console account** (skip if they already have one). At
+   `play.google.com/console/signup`, pay the one-time $25 registration fee
+   and complete Google's identity verification (a person, or a D-U-N-S
+   number for an organization) — this can take anywhere from minutes to a
+   few days and is entirely out of your hands; tell the developer to come
+   back once it's approved, and don't attempt any of the steps below until
+   then.
+2. **Create the app shell.** In Play Console, "Create app" → enter an app
+   name, default language, "App" (not "Game"), and free/paid → accept the
+   Developer Program Policies and US export laws declarations. The package
+   name (`package_id`) itself gets locked in later, from the first bundle
+   upload — it isn't typed in at this step.
+3. **Required content declarations.** Play Console's "App content" section
+   (the left-nav label has moved before and may move again — look for
+   whatever section groups privacy policy, ads, content rating, target
+   audience, and data safety, regardless of its current name). None of these
+   are exposed by the Publishing API, so the developer must click through
+   them by hand: privacy policy URL (use
+   `https://appy.fyi/privacy/<package_id>` if that upload above succeeded,
+   otherwise `legal.privacy_policy_url`), an ads declaration, the content
+   rating questionnaire (IARC — you may draft suggested answers from
+   `features[]` and `legal` for the developer to review, but they must
+   submit it themselves, since it's a legal attestation), target audience,
+   and the data safety form (populate from `legal.data_collected`). A
+   release can't roll out to *any* track, including internal testing, until
+   these are complete — if the developer hasn't finished them yet, say so
+   and stop here rather than attempting an upload you know will fail.
+4. **Link a Google Cloud project.** Play Console → Setup → API access → link
+   an existing Google Cloud project, or let Play create one. Note which
+   project it is — steps 5–6 happen inside it.
+5. **Enable the API.** In that Cloud project's console
+   (`console.cloud.google.com`) → APIs & Services → Library → search "Google
+   Play Android Developer API" → Enable.
+6. **Create a service account and key.** Same Cloud project → IAM & Admin →
+   Service Accounts → Create Service Account (no project-level IAM role is
+   needed) → open it → Keys tab → Add Key → Create new key → JSON. This
+   downloads a credentials file — treat it as a secret from the moment it
+   exists: never commit it, keep it outside this project's git tree (or add
+   its exact filename to `.gitignore` if that's not possible), and never
+   paste its contents into a file or message you might commit or log.
+7. **Grant the service account Play Console permissions.** Back in Play
+   Console → Setup → API access, find the new service account → "Manage
+   Play Console permissions" → grant it release management for this app
+   (testing tracks at minimum) and, if billing products will be created via
+   API, product/order management too. An account Owner may need to approve
+   this before it becomes active — if calls 403 later, this is the first
+   thing to have the developer re-check.
+8. **Hand you the credentials.** The developer points you at the downloaded
+   JSON key — a file path, or an env var (e.g.
+   `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`) holding one — and tells you to
+   proceed. Until you have this, none of the steps below are possible, and
+   if all the developer wants is a build you hand them directly instead of
+   one you publish yourself, steps 4 onward (and this whole subsection)
+   simply don't apply — that's a normal, complete outcome too, not a
+   shortcut you took.
+
+Once you have a working credential and step 3's declarations are complete,
+use it (the `googleapis` npm package's `androidpublisher` v3 client, or
+equivalent direct REST calls with a signed JWT) to:
+
+- `edits.insert` → open an edit.
+- `edits.bundles.upload` → upload the signed `.aab` `build_instructions`
+  produces.
+- `edits.tracks.update` → assign the uploaded version code to the
+  **`internal`** testing track only. Never target `production`, `beta`, or
+  any other track — promoting past internal testing is a real-users,
+  real-money, real-store-presence action, so it stays a human decision, the
+  same way trademark clearance and the privacy claim do. State this
+  explicitly in your final report rather than letting silence imply you went
+  further.
+- `edits.listings.update` → push `store_listing.title` /
+  `short_description` / `long_description` for the app's default language.
+- `edits.commit` → finalize the edit.
+- If `pricing.billing_lib` is `play_billing_direct`: create the billing
+  product with `inappproducts.insert` (`pricing.model === "one_time"`) or
+  `monetization.subscriptions.create` (`pricing.model === "subscription"`),
+  using `pricing.price_usd` as the default price (region `"US"`,
+  auto-convert on for the rest). Use whatever product ID your Play Billing
+  integration code actually references, and state that exact ID in your
+  final report so the developer (or you, next time) can find it again. If
+  `pricing.billing_lib` is `revenuecat` instead, skip this entirely —
+  RevenueCat manages its own product catalog through its own dashboard, not
+  through this API.
+
+A `403` on any of these calls means the service account either isn't
+linked, wasn't granted the right permission, or is still pending Owner
+approval — stop, don't retry blindly, and tell the developer which of step
+6/7 to re-check.
+
+### Purchases API: server-side entitlement verification
+
+Only applies when `backend` is `"firebase"` **and** `pricing.billing_lib`
+is `play_billing_direct` — when `billing_lib` is `revenuecat`, its own
+backend already verifies purchases server-side; don't duplicate that.
+
+Trusting a client-reported purchase is unsafe — implement a Firebase Cloud
+Function (HTTPS callable) that receives the purchase token and product ID
+after a purchase completes, then calls `purchases.products.get`
+(`pricing.model === "one_time"`) or `purchases.subscriptionsv2.get`
+(`pricing.model === "subscription"`) against the Google Play Developer API
+before writing the entitlement to Firestore — never grant the entitlement
+from the client-reported result alone. You can reuse the same service
+account from the Publishing API walkthrough above if the developer only
+wants to manage one, but least-privilege is better here: have them create a
+second service account scoped to just financial-data/order permissions,
+with no release-management grant, since this function never needs to touch
+a release. Store whichever key this function uses as a Firebase Functions
+secret (`firebase functions:secrets:set`), never inline in source or
+committed to the repo. This is also the verification step §6's Play
+Integrity paragraph hooks into when that API is in play.
+
 - `human_gates_required[]` in the spec lists which of these still apply —
   echo them back in your final report as the open items, don't resolve them
   yourself.
 
-## 7. Verify
+## 8. Verify
 
 Run `build_instructions` (or the equivalent up through the test tasks — skip
 the signing/`bundleRelease` step unless the user asks for a signed build) if
@@ -254,14 +415,20 @@ isn't, say so explicitly rather than reporting untested code as passing —
 "builds and tests pass" is a claim you need to have actually run, not
 inferred from the code looking right.
 
-## 8. Final report
+## 9. Final report
 
 Summarize: what got built (screens/features/tests), what `build_instructions`
-actually did or didn't run and why, the screenshot gap from §5, and the
-open `human_gates_required[]` items from §6 as an explicit checklist — not a
-buried caveat. If the privacy policy upload in §6 succeeded, include the
+actually did or didn't run and why, the screenshot gap from §5, which of §6's
+In-App Review / Play Integrity APIs got added (and why Integrity was skipped,
+if it was), and the open `human_gates_required[]` items from §7 as an
+explicit checklist — not a buried caveat. If §7's Google Play Developer API
+walkthrough got as far as an internal-testing upload, state that plainly
+(track = internal, never further) along with the billing product ID if one
+was created; if the developer hasn't finished §7's steps 1–3 yet, list
+exactly which of those remain instead of a generic "publishing is manual"
+note. If the privacy policy upload in §7 succeeded, include the
 `https://appy.fyi/privacy/<package_id>` confirmation link in that checklist too,
 so the user has a concrete next action instead of just being told it's
-"uploaded." If the app_page upload in §6 succeeded, include its response
+"uploaded." If the app_page upload in §7 succeeded, include its response
 `url` too, and remind the user the screenshot slots are still empty and up
 to them to fill in.
