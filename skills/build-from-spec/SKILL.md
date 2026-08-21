@@ -18,6 +18,9 @@ say so rather than inventing scope.
 Look for a single `*-build-spec.json` file in the project root (or wherever
 the user points you). Read the whole file before doing anything else — don't
 start scaffolding off a partial read. If more than one matches, ask which.
+Note the `<play_id>` prefix of the filename itself (it matches the
+`/report/:play_id/build-spec.json` path this file was downloaded from) —
+§6 needs it later to build the live privacy-policy confirmation link.
 
 The JSON has this shape (all fields always present):
 
@@ -25,19 +28,21 @@ The JSON has this shape (all fields always present):
   independent, alternative app competing with an incumbent Play Store app,
   not a modification, clone, or reskin of the incumbent's own code or
   branding. Treat the incumbent purely as a market reference.
-- `api_access` — optional, live enrichment beyond the static report data
-  baked into the rest of this spec. `base_url` plus three GET endpoints
-  (`endpoints.app_info`, `endpoints.reviews`, `endpoints.app_photos`), each
-  already a full URL for this specific app — nothing to template yourself.
-  `instructions` says how to call them: send `Authorization: Bearer <key>`
-  using the `APPY_API_KEY` environment variable if it's set. In particular,
-  `endpoints.app_photos` returns CDN URLs for the incumbent's own Play Store
-  screenshots — worth fetching for visual/UX inspiration (layout, information
-  density, what the current app actually looks like) before designing
+- `api_access` — `base_url` plus four endpoints, each already a full URL for
+  this specific app — nothing to template yourself. `instructions` says how
+  to call them: send `Authorization: Bearer <key>` using the `APPY_API_KEY`
+  environment variable if it's set. Three (`endpoints.app_info`,
+  `endpoints.reviews`, `endpoints.app_photos`) are GET, optional live
+  enrichment beyond the static report data baked into the rest of this spec.
+  In particular, `endpoints.app_photos` returns CDN URLs for the incumbent's
+  own Play Store screenshots — worth fetching for visual/UX inspiration
+  (layout, information density, what the current app actually looks like)
+  before designing
   `design_system` and `screens[]`, since the report's prose alone doesn't
-  convey that. If `APPY_API_KEY` isn't set, or a call 401s, skip `api_access`
-  entirely and proceed with the rest of the spec — it's enrichment, never a
-  blocker.
+  convey that. If `APPY_API_KEY` isn't set, or a call 401s, skip these three
+  entirely and proceed with the rest of the spec — they're enrichment, never
+  a blocker. The fourth, `endpoints.privacy_policy`, is a POST — see §6,
+  where it's actually used, for what to send it and when.
 - `working_name`, `package_id`, `positioning`, `non_goals[]` — what to build
   and its explicit scope boundary. `trademark_cleared: false` always — see
   §6.
@@ -164,6 +169,28 @@ Concretely, that means:
   `legal.data_collected`/`legal.privacy_policy_url` as the draft — but don't
   assert anywhere in your final report that the name is trademark-clear or
   that the privacy claim has been verified. Those are still open.
+  If `APPY_API_KEY` is set, also `POST` the drafted policy text as the raw
+  request body to `api_access.endpoints.privacy_policy` — unlike the three
+  GET endpoints above, this one needs a real appy.fyi account's key (minted
+  at `<base_url>/profile`), not a bare integration key, since the upload is
+  attributed to whoever's key made it. On success, use the response's `url`
+  field — a real, publicly reachable page — as this app's actual privacy
+  policy link (store listing, in-app settings, manifest metadata) instead of
+  the unhosted `legal.privacy_policy_url` suggestion. Then, in your final
+  report, also give the user the live confirmation page —
+  `https://appy.fyi/privacy/<play_id>`, using the `play_id` noted in §0 —
+  and say so explicitly as a human-gate item: the upload isn't confirmed
+  until the user has opened that URL and checked the page actually reads
+  correctly, not just that the POST returned 200. A `413` means the text
+  is over the size cap — shorten it, don't retry as-is. A `403` means either
+  no `userId` on the key (an integration key was used — fall back to leaving
+  `legal.privacy_policy_url` as the placeholder and flag this in your final
+  report) or that account already has the max number of policies uploaded
+  (reuse whichever existing upload's URL is appropriate, don't keep retrying).
+  Either way this is enrichment on top of a policy you've already drafted
+  locally, never a build blocker: if `APPY_API_KEY` isn't set or the call
+  fails for any other reason, proceed with the local draft and the unhosted
+  placeholder URL, same as skipping the GET endpoints above.
 - Generate a local debug/upload keystore for `build_instructions` to run
   against (that's a disposable local artifact, fine to create), but flag the
   placeholder store/key passwords in `build_instructions` as needing to be
@@ -191,4 +218,7 @@ inferred from the code looking right.
 Summarize: what got built (screens/features/tests), what `build_instructions`
 actually did or didn't run and why, the screenshot gap from §5, and the
 open `human_gates_required[]` items from §6 as an explicit checklist — not a
-buried caveat.
+buried caveat. If the privacy policy upload in §6 succeeded, include the
+`https://appy.fyi/privacy/<play_id>` confirmation link in that checklist too,
+so the user has a concrete next action instead of just being told it's
+"uploaded."
