@@ -187,10 +187,15 @@ Concretely, that means:
   `legal.privacy_policy_url` as the placeholder and flag this in your final
   report) or that account already has the max number of policies uploaded
   (reuse whichever existing upload's URL is appropriate, don't keep retrying).
-  Either way this is enrichment on top of a policy you've already drafted
-  locally, never a build blocker: if `APPY_API_KEY` isn't set or the call
-  fails for any other reason, proceed with the local draft and the unhosted
-  placeholder URL, same as skipping the GET endpoints above.
+  A `409` means someone else already claimed this `play_id` — appy.fyi hosts
+  one policy per app, first uploader wins — so use the existing
+  `https://appy.fyi/privacy/<play_id>` page as the reference instead of
+  retrying, and note in your final report that the hosted page reflects
+  another builder's policy, not necessarily this one. Either way this is
+  enrichment on top of a policy you've already drafted locally, never a
+  build blocker: if `APPY_API_KEY` isn't set or the call fails for any other
+  reason, proceed with the local draft and the unhosted placeholder URL,
+  same as skipping the GET endpoints above.
 - Generate a local debug/upload keystore for `build_instructions` to run
   against (that's a disposable local artifact, fine to create), but flag the
   placeholder store/key passwords in `build_instructions` as needing to be
