@@ -19,12 +19,35 @@ Look for a single `*-build-spec.json` file in the project root (or wherever
 the user points you) — dropped in by hand from the website, or already
 fetched for you by this plugin's own `/build` command. Read the whole file
 before doing anything else — don't start scaffolding off a partial read. If
-more than one matches, ask which. The incumbent's play_id is
+more than one matches, ask which.
+
+If this project root sits inside a shared multi-app folder (e.g.
+`~/apps/<package_id>/`, one subfolder per app, as `/build` sets up — see
+`commands/build.md`), treat that subfolder as the entire filesystem for the
+rest of this skill: every file this skill writes (§1–§8) stays inside it.
+Never read, write, or otherwise touch a sibling app's subfolder, even to
+compare notes or reuse a dependency version, and never write anything
+directly into the shared apps root itself — that folder isn't a project,
+it's just a container. This holds whether you're running standalone or as
+one of several parallel per-app builds `/build` launched at once; either
+way, this subfolder is the only context that exists, exactly like the "no
+relationship to appy.fyi" framing above.
+
+The incumbent's play_id is
 `original_app.play_id` in the JSON itself (not something to parse from the
 filename, which varies depending on how the file was obtained) — this is the
-`<play_id>` used below as `origin_play_id` in the `ownership` call and the
-three GET endpoints. §8's confirmation links use `package_id` (this app's
-own id) instead.
+`<play_id>` used below as `origin_play_id` for the three GET endpoints.
+`package_id` (this app's own id) is already the real, final value appy.fyi
+substituted in when it handed you this spec — it's `fyi.appy.<app_name>.
+<username>`, already claimed by this account, never something to invent or
+change. §8's confirmation links use it too.
+
+This spec never contains a claim step or any endpoint URLs — see "Calling
+appy.fyi's API" below for both. Claiming already happened before this spec
+could ever be fetched (this plugin can't claim an app itself — see
+`commands/list.md`), and every endpoint this skill calls is a fixed,
+predictable URL this file documents once rather than the spec repeating it
+per app.
 
 The JSON has this shape (all fields always present):
 
@@ -32,37 +55,10 @@ The JSON has this shape (all fields always present):
   independent, alternative app competing with an incumbent Play Store app,
   not a modification, clone, or reskin of the incumbent's own code or
   branding. Treat the incumbent purely as a market reference.
-- `api_access` — `base_url` plus eight endpoints, each already a full URL
-  for this specific app, except that `endpoints.privacy_policy`,
-  `endpoints.app_page`, `endpoints.app_page_icon`, and
-  `endpoints.app_page_screenshot` end in a literal `:user_play_id`
-  placeholder — replace every one of those with `package_id` (this app's own
-  id), never with the incumbent's `<play_id>` from §0. `instructions` says
-  how to call them: send `Authorization: Bearer <key>` using the
-  `APPY_API_KEY` environment variable if it's set. Call `endpoints.ownership`
-  FIRST — `POST` JSON `{"origin_play_id": "<play_id>", "user_play_id":
-  package_id}` — this permanently claims that pair for the signed-in account
-  (max 2 claims per account, and `user_play_id` can never change once
-  claimed); every other endpoint below 403s until this succeeds. If
-  `APPY_API_KEY` isn't set, or this call 401s/403s, skip every remaining
-  endpoint below and proceed with the rest of the spec — the whole block,
-  ownership included, is enrichment, never a build blocker. Otherwise, three
-  (`endpoints.app_info`, `endpoints.reviews`, `endpoints.app_photos`) are GET,
-  optional live enrichment beyond the static report data baked into the rest
-  of this spec, scoped to the incumbent (`<play_id>`). In particular,
-  `endpoints.app_photos` returns CDN URLs for the incumbent's own Play Store
-  screenshots — worth fetching for visual/UX inspiration (layout, information
-  density, what the current app actually looks like) before designing
-  `design_system` and `screens[]`, since the report's prose alone doesn't
-  convey that. The other four — `endpoints.privacy_policy`,
-  `endpoints.app_page`, `endpoints.app_page_icon`, and
-  `endpoints.app_page_screenshot` — are POSTs, scoped to `package_id` (this
-  app, not the incumbent), all used at the very end of the build, in §8.
 - `original_app` — the incumbent's static identity: `name`, `play_id`
   (§0's `<play_id>`), `play_store_url`, `report_url`, and optionally
   `category`/`price_trend` if appy.fyi has that data on file. Always
-  present, independent of whether any `api_access` call was ever made — this
-  is what §6's `README.md` names and links.
+  present — this is what §6's `README.md` names and links.
 - `working_name`, `package_id`, `positioning`, `non_goals[]` — what to build
   and its explicit scope boundary. `trademark_cleared: false` always — see
   §8.
@@ -100,6 +96,58 @@ The JSON has this shape (all fields always present):
   a test function.
 - `build_instructions` — literal shell commands to build, test, and sign.
 - `human_gates_required[]` — see §8.
+
+### Calling appy.fyi's API
+
+Everything below is enrichment, never a build blocker — this whole
+subsection is safe to skip entirely (proceed with the rest of the spec as-is)
+if `APPY_API_KEY` isn't set, or if the first call you try 401s/403s. Read the
+`APPY_API_KEY` environment variable and send it as `Authorization: Bearer
+<key>` on every call below. Get a key free, self-serve, by signing in at
+`https://appy.fyi/profile` — no waiting on anyone. There's no separate claim
+call to make here — that already happened before this spec could ever be
+fetched (see §0), so every endpoint below just works against the account
+that already owns `package_id`.
+
+Three GETs, scoped to the incumbent (`<play_id>`, §0), no body — optional
+live enrichment beyond the static report data baked into the rest of this
+spec:
+- `GET https://appy.fyi/api/app_info/<play_id>` — title/description/score/
+  price, live and more current than the report snapshot in this spec.
+- `GET https://appy.fyi/api/reviews/<play_id>` — a digest of at most 30
+  latest long-enough incumbent reviews, for inspiration beyond what
+  `market_gap` already summarized.
+- `GET https://appy.fyi/api/app_photos/<play_id>` — CDN URLs for the
+  incumbent's own Play Store preview screenshots, worth fetching for visual/
+  UX inspiration (layout, information density, what the current app actually
+  looks like) before designing `design_system` and `screens[]`, since the
+  report's prose alone doesn't convey that.
+
+Four POSTs, scoped to `package_id` (this app, not the incumbent, §0), all
+used at the very end of the build, in §8:
+- `POST https://appy.fyi/api/privacy_policy/<package_id>` — the drafted
+  privacy policy as the plain-text request body; on success the JSON
+  response's `url` field is a real, hosted privacy policy URL, replacing
+  `legal.privacy_policy_url` (only ever a suggestion, never actually
+  hosted). A `413` means the text is over the size cap — shorten it, don't
+  retry as-is.
+- `POST https://appy.fyi/api/app_page/<package_id>` — JSON body `{"name":
+  working_name, "description": store_listing.long_description}`, publishes a
+  Google-Play-style page for this app on appy.fyi. Response's `url` field is
+  the page's address. Call this before either endpoint below — both need the
+  page to already exist.
+- `POST https://appy.fyi/api/app_page/<package_id>/icon` — the raw image
+  bytes as the request body, `Content-Type` one of `image/png`,
+  `image/jpeg`, `image/webp`.
+- `POST https://appy.fyi/api/app_page/<package_id>/screenshot/<position>` —
+  append `/1` through `/5` for the slot position (Play-Store-style, up to 5,
+  in display order), raw image bytes as the body, same `Content-Type` rule
+  as the icon endpoint.
+
+A `403` on any of the four POSTs means this key isn't the same account that
+claimed `package_id` (shouldn't happen — you fetched this exact spec with
+this exact key) or is a bare integration key rather than one minted at
+`/profile` — stop and flag it in your final report rather than retrying.
 
 ## 1. Scaffold the project
 
@@ -172,8 +220,8 @@ icon_prompt` is unused by this flow (kept in the schema for optional future
 AI-generated icon experiments, not this skill's path).
 
 Play listing screenshots are not produced by this skill — note that gap in
-your final report. `api_access.endpoints.app_photos` (see above) is for
-reference during design, not a source of assets to ship — per
+your final report. `GET /api/app_photos/<play_id>` (§0's "Calling appy.fyi's
+API") is for reference during design, not a source of assets to ship — per
 `project_context`, this app's own icon and screenshots must be its own, not
 the incumbent's.
 
@@ -188,30 +236,12 @@ tolerates its absence — never treat it as a build blocker.
 
 ## 6. README.md — disclose the incumbent
 
-Every app built from a spec is an alternative to a specific, named incumbent
-(`original_app` — see §0), never an anonymous "competitor app." Write a
-`README.md` in the project root that states this plainly, near the top:
-
-- The app's own name (`working_name`) and one-line `positioning`.
-- A named, linked disclosure: "`working_name` is an independent alternative
-  to [`original_app.name`](`original_app.play_store_url`) — not affiliated
-  with, endorsed by, or a modification of it." Link `original_app.report_url`
-  too, as the market research this app's feature set was built from.
-- Whether the incumbent itself is open source. Check this yourself — don't
-  guess and don't leave it unstated. Search for `original_app.name` plus
-  terms like "github", "source code", or "open source" (its Play Store
-  listing description or developer website, if `api_access.endpoints.app_info`
-  was reachable in §0, sometimes says so directly; otherwise a web search for
-  the incumbent's own name is the next step). If you find a real public
-  repository, name it and link it and say the incumbent is open source; if
-  you find clear evidence it's closed-source (proprietary, no public repo
-  after a real search), say that instead; if the search is genuinely
-  inconclusive, say so honestly ("couldn't confirm whether the incumbent is
-  open source") rather than asserting either way.
-- The standard sections a new project needs anyway: what it does
-  (`positioning` + a short feature list from `features[]`), `min_sdk`, how to
-  build it (`build_instructions`), and current status (which
-  `human_gates_required[]` are still open — see §8).
+Run this plugin's `/readme` command (see `commands/readme.md`) against the
+build-spec.json already read in §0 — it writes the project's `README.md`,
+naming and linking the incumbent (`original_app`), disclosing this is an
+independent alternative, and researching + stating whether that incumbent is
+itself open source. The same command works standalone later too, e.g. to
+refresh the README without repeating any other build step.
 
 ## 7. Play Store readiness (client-side, no gate)
 
@@ -266,47 +296,41 @@ means:
   `legal.data_collected`/`legal.privacy_policy_url` as the draft — but don't
   assert anywhere in your final report that the name is trademark-clear or
   that the privacy claim has been verified. Those are still open.
-  If `APPY_API_KEY` is set and the `ownership` claim from §0 succeeded, also
-  `POST` the drafted policy text as the raw request body to
-  `api_access.endpoints.privacy_policy` (with `package_id` substituted for
-  its `:user_play_id` placeholder) — unlike the three GET endpoints above,
-  this one needs the same real appy.fyi account whose key claimed ownership
-  in §0. On success, use the response's `url` field — a real, publicly
-  reachable page — as this app's actual privacy policy link (store listing,
-  in-app settings, manifest metadata) instead of the unhosted
-  `legal.privacy_policy_url` suggestion. Then, in your final report, also
-  give the user the live confirmation page —
-  `https://appy.fyi/privacy/<package_id>`, using `package_id` (this app's own
-  id, not the incumbent's `<play_id>` from §0) — and say so explicitly as a
+  If `APPY_API_KEY` is set, also `POST` the drafted policy text as the raw
+  request body to `https://appy.fyi/api/privacy_policy/<package_id>` (§0's
+  "Calling appy.fyi's API"). On success, use the response's `url` field — a
+  real, publicly reachable page — as this app's actual privacy policy link
+  (store listing, in-app settings, manifest metadata) instead of the
+  unhosted `legal.privacy_policy_url` suggestion. Then, in your final report,
+  also give the user the live confirmation page —
+  `https://appy.fyi/privacy/<package_id>` — and say so explicitly as a
   human-gate item: the upload isn't confirmed until the user has opened that
   URL and checked the page actually reads correctly, not just that the POST
   returned 200. A `413` means the text is over the size cap — shorten it,
-  don't retry as-is. A `403` means `ownership` was never actually claimed
-  (an integration key was used, or the §0 call 401s/403s/failed) — fall back
-  to leaving `legal.privacy_policy_url` as the placeholder and flag this in
-  your final report. Either way this is enrichment on top of a policy you've
-  already drafted locally, never a build blocker: if `APPY_API_KEY` isn't
-  set or the call fails for any other reason, proceed with the local draft
-  and the unhosted placeholder URL, same as skipping the GET endpoints above.
-- If `APPY_API_KEY` is set and the `ownership` claim from §0 succeeded, also
-  publish this app's own appy.fyi app_page — a Google-Play-style page,
-  hosted on appy.fyi, for apps built with appy.fyi.
-  `POST` `{"name": working_name, "description": store_listing.long_description}`
-  as JSON to `api_access.endpoints.app_page` (with `package_id` substituted
-  for its `:user_play_id` placeholder); on success, `POST` the rasterized
-  icon PNG from §5 (if `sharp` was available) as the raw body to
-  `api_access.endpoints.app_page_icon` (same substitution) with
-  `Content-Type: image/png`. A `403` here means the same thing as the
-  privacy policy upload above — `ownership` was never actually claimed —
-  stop and flag it in your final report rather than retrying. Screenshot
-  upload (`api_access.endpoints.app_page_screenshot`) is skipped by default,
-  since this skill doesn't produce real in-app screenshots (see the gap
-  noted in §5) — note in your final report that the user can add up to 5
-  screenshots later themselves by POSTing image bytes to
-  `<endpoints.app_page_screenshot>/1` through `/5` (same `package_id`
-  substitution). This whole step is enrichment on top of the app you've
-  already built, never a build blocker — skip it entirely if `APPY_API_KEY`
-  isn't set or `ownership` wasn't claimed.
+  don't retry as-is. A `403` here would mean this key isn't the account that
+  claimed `package_id` (shouldn't happen, see §0) — fall back to leaving
+  `legal.privacy_policy_url` as the placeholder and flag this in your final
+  report. Either way this is enrichment on top of a policy you've already
+  drafted locally, never a build blocker: if `APPY_API_KEY` isn't set or the
+  call fails for any other reason, proceed with the local draft and the
+  unhosted placeholder URL, same as skipping the GET endpoints above.
+- If `APPY_API_KEY` is set, also publish this app's own appy.fyi app_page —
+  a Google-Play-style page, hosted on appy.fyi, for apps built with
+  appy.fyi. `POST` `{"name": working_name, "description":
+  store_listing.long_description}` as JSON to
+  `https://appy.fyi/api/app_page/<package_id>`; on success, `POST` the
+  rasterized icon PNG from §5 (if `sharp` was available) as the raw body to
+  `https://appy.fyi/api/app_page/<package_id>/icon` with `Content-Type:
+  image/png`. A `403` here means the same thing as the privacy policy upload
+  above — stop and flag it in your final report rather than retrying.
+  Screenshot upload
+  (`https://appy.fyi/api/app_page/<package_id>/screenshot/<position>`) is
+  skipped by default, since this skill doesn't produce real in-app
+  screenshots (see the gap noted in §5) — note in your final report that the
+  user can add up to 5 screenshots later themselves by POSTing image bytes to
+  that URL's `/1` through `/5`. This whole step is enrichment on top of the
+  app you've already built, never a build blocker — skip it entirely if
+  `APPY_API_KEY` isn't set.
 - Generate a local debug/upload keystore for `build_instructions` to run
   against (that's a disposable local artifact, fine to create), but flag the
   placeholder store/key passwords in `build_instructions` as needing to be
@@ -315,104 +339,20 @@ means:
 
 ### Google Play Developer API: manual setup, then automated publishing
 
-Creating the Play Console account itself, creating the app shell, and
-answering Play's content declarations cannot be done by an agent — they
-require a human to pass identity verification, accept legal declarations,
-and pay a one-time fee. Everything past that point — uploading the build to
-internal testing, writing the store listing, and creating billing
-product(s) — you can and should do yourself via the Google Play Developer
-API (`androidpublisher` v3), once the developer hands you working
-credentials. Walk the developer through this exactly once, step by step,
-before touching any of it — don't assume they already know these steps:
-
-1. **Play Console account** (skip if they already have one). At
-   `play.google.com/console/signup`, pay the one-time $25 registration fee
-   and complete Google's identity verification (a person, or a D-U-N-S
-   number for an organization) — this can take anywhere from minutes to a
-   few days and is entirely out of your hands; tell the developer to come
-   back once it's approved, and don't attempt any of the steps below until
-   then.
-2. **Create the app shell.** In Play Console, "Create app" → enter an app
-   name, default language, "App" (not "Game"), and free/paid → accept the
-   Developer Program Policies and US export laws declarations. The package
-   name (`package_id`) itself gets locked in later, from the first bundle
-   upload — it isn't typed in at this step.
-3. **Required content declarations.** Play Console's "App content" section
-   (the left-nav label has moved before and may move again — look for
-   whatever section groups privacy policy, ads, content rating, target
-   audience, and data safety, regardless of its current name). None of these
-   are exposed by the Publishing API, so the developer must click through
-   them by hand: privacy policy URL (use
-   `https://appy.fyi/privacy/<package_id>` if that upload above succeeded,
-   otherwise `legal.privacy_policy_url`), an ads declaration, the content
-   rating questionnaire (IARC — you may draft suggested answers from
-   `features[]` and `legal` for the developer to review, but they must
-   submit it themselves, since it's a legal attestation), target audience,
-   and the data safety form (populate from `legal.data_collected`). A
-   release can't roll out to *any* track, including internal testing, until
-   these are complete — if the developer hasn't finished them yet, say so
-   and stop here rather than attempting an upload you know will fail.
-4. **Link a Google Cloud project.** Play Console → Setup → API access → link
-   an existing Google Cloud project, or let Play create one. Note which
-   project it is — steps 5–6 happen inside it.
-5. **Enable the API.** In that Cloud project's console
-   (`console.cloud.google.com`) → APIs & Services → Library → search "Google
-   Play Android Developer API" → Enable.
-6. **Create a service account and key.** Same Cloud project → IAM & Admin →
-   Service Accounts → Create Service Account (no project-level IAM role is
-   needed) → open it → Keys tab → Add Key → Create new key → JSON. This
-   downloads a credentials file — treat it as a secret from the moment it
-   exists: never commit it, keep it outside this project's git tree (or add
-   its exact filename to `.gitignore` if that's not possible), and never
-   paste its contents into a file or message you might commit or log.
-7. **Grant the service account Play Console permissions.** Back in Play
-   Console → Setup → API access, find the new service account → "Manage
-   Play Console permissions" → grant it release management for this app
-   (testing tracks at minimum) and, if billing products will be created via
-   API, product/order management too. An account Owner may need to approve
-   this before it becomes active — if calls 403 later, this is the first
-   thing to have the developer re-check.
-8. **Hand you the credentials.** The developer points you at the downloaded
-   JSON key — a file path, or an env var (e.g.
-   `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`) holding one — and tells you to
-   proceed. Until you have this, none of the steps below are possible, and
-   if all the developer wants is a build you hand them directly instead of
-   one you publish yourself, steps 4 onward (and this whole subsection)
-   simply don't apply — that's a normal, complete outcome too, not a
-   shortcut you took.
-
-Once you have a working credential and step 3's declarations are complete,
-use it (the `googleapis` npm package's `androidpublisher` v3 client, or
-equivalent direct REST calls with a signed JWT) to:
-
-- `edits.insert` → open an edit.
-- `edits.bundles.upload` → upload the signed `.aab` `build_instructions`
-  produces.
-- `edits.tracks.update` → assign the uploaded version code to the
-  **`internal`** testing track only. Never target `production`, `beta`, or
-  any other track — promoting past internal testing is a real-users,
-  real-money, real-store-presence action, so it stays a human decision, the
-  same way trademark clearance and the privacy claim do. State this
-  explicitly in your final report rather than letting silence imply you went
-  further.
-- `edits.listings.update` → push `store_listing.title` /
-  `short_description` / `long_description` for the app's default language.
-- `edits.commit` → finalize the edit.
-- If `pricing.billing_lib` is `play_billing_direct`: create the billing
-  product with `inappproducts.insert` (`pricing.model === "one_time"`) or
-  `monetization.subscriptions.create` (`pricing.model === "subscription"`),
-  using `pricing.price_usd` as the default price (region `"US"`,
-  auto-convert on for the rest). Use whatever product ID your Play Billing
-  integration code actually references, and state that exact ID in your
-  final report so the developer (or you, next time) can find it again. If
-  `pricing.billing_lib` is `revenuecat` instead, skip this entirely —
-  RevenueCat manages its own product catalog through its own dashboard, not
-  through this API.
-
-A `403` on any of these calls means the service account either isn't
-linked, wasn't granted the right permission, or is still pending Owner
-approval — stop, don't retry blindly, and tell the developer which of step
-6/7 to re-check.
+Run this plugin's `/publish` command (see `commands/publish.md`) against
+the project just built — it walks the developer through the one-time Play
+Console/Cloud setup (Play Console account, app shell, content declarations,
+service account) exactly once, step by step, then uses the Google Play
+Developer API (`androidpublisher` v3, via the `googleapis` npm package or
+equivalent direct REST calls) to upload the build to the **internal**
+testing track only, push the store listing, and create the billing
+product(s) if `pricing.billing_lib` is `play_billing_direct`. Never targets
+`production`, `beta`, or any other track — promoting past internal testing
+stays a human decision, the same way trademark clearance and the privacy
+claim do. The same command works standalone later too, e.g. once the
+developer has finished the manual setup after initially skipping it, or to
+push a fresh internal-testing build after later code changes, without
+repeating any other build step.
 
 ### Purchases API: server-side entitlement verification
 
@@ -457,12 +397,12 @@ what it concluded about the incumbent's open-source status, the screenshot
 gap from §5, which of §7's In-App Review / Play Integrity APIs got added
 (and why Integrity was skipped,
 if it was), and the open `human_gates_required[]` items from §8 as an
-explicit checklist — not a buried caveat. If §8's Google Play Developer API
-walkthrough got as far as an internal-testing upload, state that plainly
-(track = internal, never further) along with the billing product ID if one
-was created; if the developer hasn't finished §8's steps 1–3 yet, list
-exactly which of those remain instead of a generic "publishing is manual"
-note. If the privacy policy upload in §8 succeeded, include the
+explicit checklist — not a buried caveat. If §8's `/publish` command got as
+far as an internal-testing upload, state that plainly (track = internal,
+never further) along with the billing product ID if one was created; if the
+developer hasn't finished `/publish`'s one-time setup yet, list exactly
+which of its numbered steps remain instead of a generic "publishing is
+manual" note. If the privacy policy upload in §8 succeeded, include the
 `https://appy.fyi/privacy/<package_id>` confirmation link in that checklist too,
 so the user has a concrete next action instead of just being told it's
 "uploaded." If the app_page upload in §8 succeeded, include its response

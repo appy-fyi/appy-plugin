@@ -8,7 +8,7 @@
     {
       "name": "build-from-spec-plugin",
       "source": "./",
-      "description": "Build a complete native Android app end-to-end from a self-contained build-spec.json — fetched via /build or dropped in by hand — including a deterministic launcher icon and Google Play Developer API integration for reviews, integrity checks, and internal-testing publishing."
+      "description": "Build a complete native Android app end-to-end from a self-contained build-spec.json — claim it on appy.fyi's website, then fetch it via /list + /build (which can build several claimed apps in parallel, each in its own subfolder of a shared apps root) or drop it in by hand — including a /readme command, a /publish command that walks through one-time Play Console/Cloud setup and uploads builds to internal testing via the Google Play Developer API, a deterministic launcher icon, and Play In-App Review/Integrity client-API integration."
     }
   ]
 }
