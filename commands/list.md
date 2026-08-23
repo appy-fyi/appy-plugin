@@ -4,7 +4,7 @@ description: List your appy.fyi claimed apps.
 
 Entry point for browsing what this appy.fyi account has already claimed.
 This command only lists — it can't claim anything new (that's a website-only
-action now, see step 3) and it doesn't fetch a build spec or build anything.
+action now, see step 4) and it doesn't fetch a build spec or build anything.
 Once you know which app you want, run this plugin's `/appy:build
 <origin_play_id>` command next.
 
@@ -16,7 +16,15 @@ sign in at `https://appy.fyi/profile` with Google, generate a key there
 `APPY_API_KEY` to it, and re-run this command. The key is required here —
 without it there is nothing to list.
 
-## 2. List claimed apps
+## 2. Check the claim quota
+
+`GET https://appy.fyi/api/profile` with the same header. Same `403
+{"error": "user_required"}` handling as step 3 below. The response is
+`{claim_allowance, claims_used, claims_left}` — show the user something like
+"N of M app claims used — K left" before listing anything, so they know
+up front whether they have room to claim another app.
+
+## 3. List claimed apps
 
 `GET https://appy.fyi/api/ownerships` with header `Authorization: Bearer
 $APPY_API_KEY`. A `403 {"error": "user_required"}` means the key is an
@@ -31,7 +39,7 @@ generated for this account, `fyi.appy.<app_name>.<username>`) — and let the
 user pick one. Mention entries with `build_spec_available: false` too, but
 note they can't be built from yet (the claim exists; appy.fyi hasn't
 generated a Tier A build spec for that incumbent). An empty array means
-nothing is claimed yet — go straight to step 3.
+nothing is claimed yet — go straight to step 4.
 
 Once the user has picked an `origin_play_id`, tell them to run `/appy:build
 <origin_play_id>` to fetch its spec and build it — each app `/appy:build`
@@ -42,7 +50,7 @@ than one, they can pass several `origin_play_id`s to a single `/appy:build`
 call and it'll build all of them in parallel, one subfolder each — see
 `commands/build.md`.
 
-## 3. Claiming a new app happens on the website, not here
+## 4. Claiming a new app happens on the website, not here
 
 This plugin can only read an app your account has *already* claimed — it has
 no way to create a new claim. If the user wants to build something not in
@@ -52,8 +60,8 @@ signed in on that app's report page (`https://appy.fyi/report/<play_id>`),
 click the "Build this" button. That claims it (appy.fyi generates the new
 app's id itself — `fyi.appy.<app_name>.<username>`, no package-id choice to
 make) and shows the exact `/plugin`/`/appy:build` commands to run next, the
-same ones this plugin's own README documents. An account can claim at most 2
-apps total, ever, and a claim can never be undone — the website button
-already enforces both; there's nothing more to confirm here. Once they've
-clicked it, re-run this command (or just `/appy:build <origin_play_id>`
-directly) — the new claim will show up.
+same ones this plugin's own README documents. A claim can never be undone,
+and the website button already stops you once you're out of the quota shown
+in step 2 — there's nothing more to confirm here. Once they've clicked it,
+re-run this command (or just `/appy:build <origin_play_id>` directly) — the
+new claim will show up.

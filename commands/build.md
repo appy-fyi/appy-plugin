@@ -27,9 +27,9 @@ without it there is nothing to fetch.
 If this command was invoked with one or more `origin_play_id` arguments (the
 incumbent's play_id, space- or comma-separated), use them directly and skip
 to step 3. Otherwise this account's claims aren't known yet — follow this
-plugin's `commands/list.md` step 2 to list them. If nothing's claimed yet (or
+plugin's `commands/list.md` step 3 to list them. If nothing's claimed yet (or
 not the app the user actually wants), this plugin can't claim one itself —
-list.md's step 3 sends them to the report page's "Build this" button on
+list.md's step 4 sends them to the report page's "Build this" button on
 appy.fyi instead; come back here once that's done. If more than one claimed
 app has `build_spec_available: true`, ask the user whether they want to
 build just one or all of them at once (building several apps at once only
@@ -45,7 +45,7 @@ For each `origin_play_id` from step 2, independently:
 `Authorization: Bearer $APPY_API_KEY`. Responses:
 - `403 {"error": "not_owner"}` — this account hasn't actually claimed that
   `origin_play_id` (run `/appy:list` to check — if it's really not claimed,
-  that only happens on appy.fyi's website, see `commands/list.md` step 3) —
+  that only happens on appy.fyi's website, see `commands/list.md` step 4) —
   don't retry silently, surface this to the user.
 - `404` — no Tier A build spec exists yet for this incumbent (matches
   `build_spec_available: false` in `/appy:list`'s output).

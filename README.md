@@ -13,9 +13,9 @@ parallel**, one subfolder each, in a single call.
 
 Bundles:
 - The `/appy:list` command — lists the apps your appy.fyi account has
-  already claimed. Claiming a *new* one (up to 2 total) happens on appy.fyi
-  itself now — sign in, open the report page for the app you want to clone,
-  and click "Build this."
+  already claimed and how many claims are left. Claiming a *new* one happens
+  on appy.fyi itself now — sign in, open the report page for the app you
+  want to clone, and click "Build this."
 - The `/appy:build` command — fetches one or more claimed apps' build specs
   straight from the appy.fyi API (no manual download needed), each into its
   own subfolder, and hands off into the skill below for each — building them
