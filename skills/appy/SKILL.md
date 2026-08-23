@@ -108,8 +108,15 @@ The JSON has this shape (all fields always present):
 Everything below is enrichment, never a build blocker — this whole
 subsection is safe to skip entirely (proceed with the rest of the spec as-is)
 if `APPY_API_KEY` isn't set, or if the first call you try 401s/403s. Read the
-`APPY_API_KEY` environment variable and send it as `Authorization: Bearer
-<key>` on every call below. Get a key free, self-serve, by signing in at
+`APPY_API_KEY` environment variable — and, since a shell command only sees
+the real process environment and never a `.env` file's contents, also check
+for a `.env` with an `APPY_API_KEY=` line at this project's own root
+(standalone) or the shared apps root one level up (inside a multi-app
+folder, §0) before concluding it's unset, since that's where `/appy:init`
+and this same skill's §1 `Taskfile.yml` setup put the key by design
+(`task`'s `dotenv:` is what loads it for `task api-*`, not this reading it
+directly). Send whichever value you find as `Authorization: Bearer <key>` on
+every call below. Get a key free, self-serve, by signing in at
 `https://appy.fyi/profile` — no waiting on anyone. There's no separate claim
 call to make here — that already happened before this spec could ever be
 fetched (see §0), so every endpoint below just works against the account

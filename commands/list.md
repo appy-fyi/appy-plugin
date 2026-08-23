@@ -10,11 +10,18 @@ Once you know which app you want, run this plugin's `/appy:build
 
 ## 1. Check for a key
 
-Read the `APPY_API_KEY` environment variable. If it's unset, tell the user to
-sign in at `https://appy.fyi/profile` with Google, generate a key there
-(free, self-serve, no waiting — one active key per account), set
-`APPY_API_KEY` to it, and re-run this command. The key is required here —
-without it there is nothing to list.
+Read the `APPY_API_KEY` environment variable. A shell command only sees the
+real process environment, never a `.env` file's contents — so also check for
+a `.env` with an `APPY_API_KEY=` line in the current directory, since that's
+where `/appy:init` (`commands/init.md` step 3) and the `appy` skill's own
+`Taskfile.yml` setup put the key by design (`task`'s `dotenv:` is what loads
+it for `task api-*`, not this command reading it directly). Use whichever
+value you find. If neither the environment nor a `.env` file has it, tell
+the user to sign in at `https://appy.fyi/profile` with Google, generate a
+key there (free, self-serve, no waiting — one active key per account), and
+either set `APPY_API_KEY` in their shell or write `APPY_API_KEY=<key>` to
+`.env` (`/appy:init` does this for them), then re-run this command. The key
+is required here — without it there is nothing to list.
 
 ## 2. Check the claim quota
 
