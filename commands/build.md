@@ -53,21 +53,41 @@ For each `origin_play_id` from step 2, independently:
 
 Read `package_id` out of the returned JSON — this app's own id, e.g.
 `com.example.myapp` — and use it as the subfolder name. If
-`./<package_id>/` doesn't exist yet, create it. If it already exists (this
-app was fetched or built here before), tell the user that and confirm
-whether to proceed — e.g. to refresh the spec after it changed on
-appy.fyi — before overwriting anything inside it.
+`./<package_id>/` doesn't exist yet, create it and proceed straight to
+saving the spec below — a brand-new subfolder has nothing to check for yet.
 
-Save the response body verbatim to `./<package_id>/<origin_play_id>-build-spec.json`
-— same filename shape and content the website's "Download build spec" link
+If `./<package_id>/` already exists (this app was fetched or built here
+before), check for `Taskfile.yml` and `.env` in it before saving anything:
+
+- **Both already there:** this looks like a completed build being
+  refreshed — tell the user the folder already exists and confirm whether
+  to proceed (e.g. to refresh the spec after it changed on appy.fyi) before
+  overwriting anything inside it.
+- **Either missing:** don't save this spec or carry this `origin_play_id`
+  into step 4 — a full skill rebuild is needless work for what's actually
+  just a files backfill. Tell the user `Taskfile.yml`/`.env` is missing
+  from `./<package_id>/` and ask them to run `/appy:init` there instead,
+  which backfills exactly these two files without repeating any build
+  step. Skip this `origin_play_id` for the rest of this command unless the
+  user explicitly asks for a full rebuild instead.
+
+Unless this `origin_play_id` was just skipped above, save the response body
+verbatim to `./<package_id>/<origin_play_id>-build-spec.json` — same
+filename shape and content the website's "Download build spec" link
 produces, just relocated into that app's own subfolder instead of the
 current directory.
 
 When several `origin_play_id`s were requested, do all of these fetches
 before moving on to step 4 — they're independent API calls, safe to run back
 to back (or concurrently) regardless of how step 4 ends up building them.
+Any skipped above (missing `Taskfile.yml`/`.env` in an existing subfolder)
+don't proceed to step 4 at all — only the ones actually saved do.
 
 ## 4. Build
+
+If every requested `origin_play_id` was skipped in step 3, stop here — there's
+nothing to build until the user runs `/appy:init` in those subfolders (or
+asks for a full rebuild instead).
 
 - **One app fetched:** hand off directly into this plugin's `appy`
   skill using the file just written in `./<package_id>/`, starting at its

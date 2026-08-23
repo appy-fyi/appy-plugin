@@ -429,8 +429,8 @@ means:
   real, publicly reachable page — as this app's actual privacy policy link
   (store listing, in-app settings, manifest metadata) instead of the
   unhosted `legal.privacy_policy_url` suggestion. Then, in your final report,
-  also give the user the live confirmation page —
-  `https://appy.fyi/privacy/<package_id>` — and say so explicitly as a
+  also give the user the live confirmation page — the response's `url` field
+  itself, `https://appy.fyi/app/<package_id>/privacy` — and say so explicitly as a
   human-gate item: the upload isn't confirmed until the user has opened that
   URL and checked the page actually reads correctly, not just that the POST
   returned 200. A `413` means the text is over the size cap — shorten it,
@@ -530,8 +530,18 @@ never further) along with the billing product ID if one was created; if the
 developer hasn't finished `/appy:publish`'s one-time setup yet, list exactly
 which of its numbered steps remain instead of a generic "publishing is
 manual" note. If the privacy policy upload in §8 succeeded, include the
-`https://appy.fyi/privacy/<package_id>` confirmation link in that checklist too,
+`https://appy.fyi/app/<package_id>/privacy` confirmation link in that checklist too,
 so the user has a concrete next action instead of just being told it's
 "uploaded." If the app_page upload in §8 succeeded, include its response
 `url` too, and remind the user the screenshot slots are still empty and up
 to them to fill in.
+
+Also always tell the user about `Taskfile.yml` (§1) as a concrete,
+standing capability, not a buried implementation detail: `task build`,
+`task test`, `task install` (pushes to a connected device/emulator),
+`task release`, and every `task api-*` command now work directly from a
+terminal in this project, with no further Claude Code turn needed for any
+of them. If `.env` doesn't exist yet (this skill never creates it — see
+§1), say so explicitly and point them at this plugin's `/appy:init`
+command to add it, since the `api-*` tasks need `APPY_API_KEY` there to
+work.

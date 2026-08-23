@@ -58,7 +58,7 @@ skip whichever they confirm they've already done:
    audience, and data safety, regardless of its current name). None of these
    are exposed by the Publishing API, so the developer must click through
    them by hand: privacy policy URL (use
-   `https://appy.fyi/privacy/<package_id>` if that upload succeeded during
+   `https://appy.fyi/app/<package_id>/privacy` if that upload succeeded during
    the build, otherwise `legal.privacy_policy_url`), an ads declaration, the
    content rating questionnaire (IARC — you may draft suggested answers from
    `features[]` and `legal` for the developer to review, but they must

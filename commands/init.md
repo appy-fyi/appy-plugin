@@ -53,13 +53,39 @@ the key never ends up committed: if `.gitignore` doesn't exist, create one
 containing `.env`; if it exists but doesn't already list `.env`, append that
 line.
 
-## 4. Tell the user what's next
+## 4. Show this account's claims and ask what's next
 
 State plainly which of `Taskfile.yml`/`.env` already existed and which (if
 either) you just created. If both are in place now, tell the user they can
 run `task build`, `task install` (pushes to a connected device/emulator),
-and any `task api-*` command (e.g. `task api-profile`, `task api-app-info`)
-directly from a terminal from here on — no Claude Code turn needed for
-those. If `Taskfile.yml` is still missing because step 1 found no spec, end
-with the `/appy:build`-first instruction from step 1 as the concrete next
-action, not a buried caveat.
+`task test`/`test-instrumented`/`release`/`clean`, and any `task api-*`
+command (e.g. `task api-profile`, `task api-app-info`) directly from a
+terminal from here on — no Claude Code turn needed for those.
+
+Then show the user their appy.fyi claims, the same two things `/appy:list`
+opens with (`commands/list.md` steps 2–3): "N of M app claims used — K
+left", then every claimed app with `build_spec_available: true` as a
+numbered list (`origin_play_id` + `user_play_id`), noting any
+`build_spec_available: false` entries as not buildable yet. Prefer `task
+api-profile` and `task api-ownerships` if `Taskfile.yml` is in place here
+(dotenv loads `APPY_API_KEY` for you, no need to read the key yourself);
+otherwise call the two endpoints directly — `GET
+https://appy.fyi/api/profile` and `GET https://appy.fyi/api/ownerships`,
+header `Authorization: Bearer $APPY_API_KEY` (the key just written to
+`.env`, or already there if it existed) — same `403 {"error":
+"user_required"}` handling as `commands/list.md`.
+
+Ask what they want to do next, with the concrete options in front of them:
+- **Build a claimed app** — `/appy:build <origin_play_id>` for one from the
+  list above.
+- **Continue this project** — if step 1 found a spec here (this is that
+  app's own subfolder), `task build`/`task install` now, or
+  `/appy:publish` to walk through Play Console/Cloud setup and push to
+  internal testing.
+- **Claim something new** — not possible from here; point them at
+  `commands/list.md` step 4 (browse appy.fyi, click "Build this" on a
+  report page).
+
+If `Taskfile.yml` is still missing because step 1 found no spec, lead with
+the `/appy:build`-first instruction from step 1 as the concrete next
+action before any of the above, not a buried caveat.
