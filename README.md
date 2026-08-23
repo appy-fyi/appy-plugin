@@ -1,5 +1,10 @@
 # appy
 
+> This repo is auto-published from the `plugin/` folder of appy.fyi's
+> private repo on every push to `main`. Don't edit files here directly —
+> edit `plugin/` in appy.fyi instead, or changes will be overwritten on the
+> next sync.
+
 A [Claude Code](https://claude.com/claude-code) plugin (formerly
 `build-from-spec-plugin`) that builds a complete native Android app
 end-to-end from a self-contained `build-spec.json` — the format
