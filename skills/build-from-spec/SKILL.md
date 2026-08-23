@@ -1,6 +1,6 @@
 ---
 name: build-from-spec
-description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, wires in the Google Play In-App Review and Play Integrity client APIs, and — once the developer has completed the one-time Play Console/Cloud setup this skill walks them through step by step — calls the Google Play Developer API itself to upload the build to internal testing and create the billing product(s). It still stops cleanly at the true human-only gates (trademark clearance, privacy-claim verification, Play Console account creation/content declarations, and promotion to production) instead of guessing past them.
+description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, writes a README.md disclosing the named incumbent app this is an alternative to (and whether that incumbent is itself open source), wires in the Google Play In-App Review and Play Integrity client APIs, and — once the developer has completed the one-time Play Console/Cloud setup this skill walks them through step by step — calls the Google Play Developer API itself to upload the build to internal testing and create the billing product(s). It still stops cleanly at the true human-only gates (trademark clearance, privacy-claim verification, Play Console account creation/content declarations, and promotion to production) instead of guessing past them.
 allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/genLauncherIcon.ts *)
 ---
 
@@ -16,13 +16,15 @@ say so rather than inventing scope.
 ## 0. Find and read the spec
 
 Look for a single `*-build-spec.json` file in the project root (or wherever
-the user points you). Read the whole file before doing anything else — don't
-start scaffolding off a partial read. If more than one matches, ask which.
-Note the `<play_id>` prefix of the filename itself (it matches the
-`/report/:play_id/build-spec.json` path this file was downloaded from) — this
-is the *incumbent's* play_id, used only as `origin_play_id` in the `ownership`
-call below and the three GET endpoints. §7's confirmation links use
-`package_id` (this app's own id) instead, not this filename prefix.
+the user points you) — dropped in by hand from the website, or already
+fetched for you by this plugin's own `/build` command. Read the whole file
+before doing anything else — don't start scaffolding off a partial read. If
+more than one matches, ask which. The incumbent's play_id is
+`original_app.play_id` in the JSON itself (not something to parse from the
+filename, which varies depending on how the file was obtained) — this is the
+`<play_id>` used below as `origin_play_id` in the `ownership` call and the
+three GET endpoints. §8's confirmation links use `package_id` (this app's
+own id) instead.
 
 The JSON has this shape (all fields always present):
 
@@ -55,10 +57,15 @@ The JSON has this shape (all fields always present):
   convey that. The other four — `endpoints.privacy_policy`,
   `endpoints.app_page`, `endpoints.app_page_icon`, and
   `endpoints.app_page_screenshot` — are POSTs, scoped to `package_id` (this
-  app, not the incumbent), all used at the very end of the build, in §7.
+  app, not the incumbent), all used at the very end of the build, in §8.
+- `original_app` — the incumbent's static identity: `name`, `play_id`
+  (§0's `<play_id>`), `play_store_url`, `report_url`, and optionally
+  `category`/`price_trend` if appy.fyi has that data on file. Always
+  present, independent of whether any `api_access` call was ever made — this
+  is what §6's `README.md` names and links.
 - `working_name`, `package_id`, `positioning`, `non_goals[]` — what to build
   and its explicit scope boundary. `trademark_cleared: false` always — see
-  §7.
+  §8.
 - `tech_stack` — `kotlin_version`, `compose_bom_version`, `gradle_version`,
   and `libraries[]` (`purpose`, `gradle_coordinate`) — pinned, real versions.
   Use exactly these, don't substitute "latest."
@@ -92,7 +99,7 @@ The JSON has this shape (all fields always present):
   `steps[]`, `expected` — steps are written to be transcribed directly into
   a test function.
 - `build_instructions` — literal shell commands to build, test, and sign.
-- `human_gates_required[]` — see §7.
+- `human_gates_required[]` — see §8.
 
 ## 1. Scaffold the project
 
@@ -173,13 +180,40 @@ the incumbent's.
 If `sharp` is available, also call this plugin's exported
 `genLegacyLauncherPngs(design_system)` (`${CLAUDE_PLUGIN_ROOT}/scripts/genLauncherIcon.ts`)
 to get a flat, rasterized version of the same deterministic icon — its
-`mipmap-xxxhdpi/ic_launcher.png` entry (192×192) is what §7 uploads as the
+`mipmap-xxxhdpi/ic_launcher.png` entry (192×192) is what §8 uploads as the
 appy.fyi app_page's icon, regardless of whether this project's own `min_sdk`
 needs the `--legacy` mipmaps for itself. If `sharp` errors or is missing,
-skip the app_page icon upload in §7 the same way `--legacy` already
+skip the app_page icon upload in §8 the same way `--legacy` already
 tolerates its absence — never treat it as a build blocker.
 
-## 6. Play Store readiness (client-side, no gate)
+## 6. README.md — disclose the incumbent
+
+Every app built from a spec is an alternative to a specific, named incumbent
+(`original_app` — see §0), never an anonymous "competitor app." Write a
+`README.md` in the project root that states this plainly, near the top:
+
+- The app's own name (`working_name`) and one-line `positioning`.
+- A named, linked disclosure: "`working_name` is an independent alternative
+  to [`original_app.name`](`original_app.play_store_url`) — not affiliated
+  with, endorsed by, or a modification of it." Link `original_app.report_url`
+  too, as the market research this app's feature set was built from.
+- Whether the incumbent itself is open source. Check this yourself — don't
+  guess and don't leave it unstated. Search for `original_app.name` plus
+  terms like "github", "source code", or "open source" (its Play Store
+  listing description or developer website, if `api_access.endpoints.app_info`
+  was reachable in §0, sometimes says so directly; otherwise a web search for
+  the incumbent's own name is the next step). If you find a real public
+  repository, name it and link it and say the incumbent is open source; if
+  you find clear evidence it's closed-source (proprietary, no public repo
+  after a real search), say that instead; if the search is genuinely
+  inconclusive, say so honestly ("couldn't confirm whether the incumbent is
+  open source") rather than asserting either way.
+- The standard sections a new project needs anyway: what it does
+  (`positioning` + a short feature list from `features[]`), `min_sdk`, how to
+  build it (`build_instructions`), and current status (which
+  `human_gates_required[]` are still open — see §8).
+
+## 7. Play Store readiness (client-side, no gate)
 
 Two Google Play client libraries get added to every app this skill builds,
 regardless of whether `tech_stack.libraries[]` lists them — like the launcher
@@ -207,15 +241,15 @@ rule rather than skipping them for not being named in the spec:
   so in the final report rather than silently omitting it. When it applies:
   request an integrity token client-side right before granting the purchased
   entitlement, and verify it server-side in the same Firebase Cloud Function
-  described in §7's Purchases API section, using the same service-account
+  described in §8's Purchases API section, using the same service-account
   credentials set up there. Never decode or trust an integrity verdict
   on-device — that defeats the point of the API.
 
-Note in the final report (§9) which of these two got added, and — if the
+Note in the final report (§10) which of these two got added, and — if the
 Integrity API was skipped because `backend` is `"none"` — say so explicitly
 rather than leaving it unmentioned.
 
-## 7. Stop at the human gates — don't build past them
+## 8. Stop at the human gates — don't build past them
 
 `trademark_cleared: false` and `legal.privacy_policy_accurate: false` are
 not placeholders waiting for a value you can fill in — they're two
@@ -399,14 +433,14 @@ second service account scoped to just financial-data/order permissions,
 with no release-management grant, since this function never needs to touch
 a release. Store whichever key this function uses as a Firebase Functions
 secret (`firebase functions:secrets:set`), never inline in source or
-committed to the repo. This is also the verification step §6's Play
+committed to the repo. This is also the verification step §7's Play
 Integrity paragraph hooks into when that API is in play.
 
 - `human_gates_required[]` in the spec lists which of these still apply —
   echo them back in your final report as the open items, don't resolve them
   yourself.
 
-## 8. Verify
+## 9. Verify
 
 Run `build_instructions` (or the equivalent up through the test tasks — skip
 the signing/`bundleRelease` step unless the user asks for a signed build) if
@@ -415,20 +449,22 @@ isn't, say so explicitly rather than reporting untested code as passing —
 "builds and tests pass" is a claim you need to have actually run, not
 inferred from the code looking right.
 
-## 9. Final report
+## 10. Final report
 
 Summarize: what got built (screens/features/tests), what `build_instructions`
-actually did or didn't run and why, the screenshot gap from §5, which of §6's
-In-App Review / Play Integrity APIs got added (and why Integrity was skipped,
-if it was), and the open `human_gates_required[]` items from §7 as an
-explicit checklist — not a buried caveat. If §7's Google Play Developer API
+actually did or didn't run and why, whether §6's `README.md` got written and
+what it concluded about the incumbent's open-source status, the screenshot
+gap from §5, which of §7's In-App Review / Play Integrity APIs got added
+(and why Integrity was skipped,
+if it was), and the open `human_gates_required[]` items from §8 as an
+explicit checklist — not a buried caveat. If §8's Google Play Developer API
 walkthrough got as far as an internal-testing upload, state that plainly
 (track = internal, never further) along with the billing product ID if one
-was created; if the developer hasn't finished §7's steps 1–3 yet, list
+was created; if the developer hasn't finished §8's steps 1–3 yet, list
 exactly which of those remain instead of a generic "publishing is manual"
-note. If the privacy policy upload in §7 succeeded, include the
+note. If the privacy policy upload in §8 succeeded, include the
 `https://appy.fyi/privacy/<package_id>` confirmation link in that checklist too,
 so the user has a concrete next action instead of just being told it's
-"uploaded." If the app_page upload in §7 succeeded, include its response
+"uploaded." If the app_page upload in §8 succeeded, include its response
 `url` too, and remind the user the screenshot slots are still empty and up
 to them to fill in.
