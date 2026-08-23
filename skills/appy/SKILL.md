@@ -1,6 +1,6 @@
 ---
 name: appy
-description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, writes a README.md disclosing the named incumbent app this is an alternative to (and whether that incumbent is itself open source), wires in the Google Play In-App Review and Play Integrity client APIs, and — once the developer has completed the one-time Play Console/Cloud setup this skill walks them through step by step — calls the Google Play Developer API itself to upload the build to internal testing and create the billing product(s). It still stops cleanly at the true human-only gates (trademark clearance, privacy-claim verification, Play Console account creation/content declarations, and promotion to production) instead of guessing past them.
+description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, writes a Taskfile.yml with named commands (build/test/install/release/clean) to manage it, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, writes a README.md disclosing the named incumbent app this is an alternative to (and whether that incumbent is itself open source), wires in the Google Play In-App Review and Play Integrity client APIs, and — once the developer has completed the one-time Play Console/Cloud setup this skill walks them through step by step — calls the Google Play Developer API itself to upload the build to internal testing and create the billing product(s). It still stops cleanly at the true human-only gates (trademark clearance, privacy-claim verification, Play Console account creation/content declarations, and promotion to production) instead of guessing past them.
 allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/genLauncherIcon.ts *)
 ---
 
@@ -157,6 +157,133 @@ Create a standard Gradle Android project: `settings.gradle.kts`, root and
 Kotlin/Compose BOM/Gradle versions from `tech_stack` exactly. Add every
 `tech_stack.libraries[].gradle_coordinate` as a dependency and nothing else
 speculative. Declare only `permissions[]` in the manifest.
+
+### Taskfile.yml — commands to manage the app
+
+Alongside the Gradle project, write a `Taskfile.yml` for the
+[Task](https://taskfile.dev) runner (`go-task`) at the project root, so
+managing this app — building it, pushing it to a device, and calling every
+appy.fyi API endpoint below — is a short, memorable command instead of a raw
+Gradle/curl invocation someone has to look up or re-paste every time.
+`dotenv: ['.env']` loads `$APPY_API_KEY` for the `api-*` tasks from a
+`.env` file at the project root — this skill doesn't create that file itself
+(that's this plugin's `/appy:init` command), but if a `.gitignore` doesn't
+already exist, create one containing `.env` so a real key never accidentally
+gets committed; if `.gitignore` already exists and lacks a `.env` line, add
+one.
+
+```yaml
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  ORIGIN_PLAY_ID: <original_app.play_id from the spec, §0>
+  PACKAGE_ID: <package_id from the spec, §0>
+
+tasks:
+  build:
+    desc: Assemble a debug APK
+    cmds:
+      - ./gradlew assembleDebug
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - ./gradlew testDebugUnitTest
+
+  test-instrumented:
+    desc: Run instrumented tests on a connected device/emulator
+    cmds:
+      - ./gradlew connectedDebugAndroidTest
+
+  install:
+    desc: Build and push the debug APK to a connected device/emulator
+    deps: [build]
+    cmds:
+      - ./gradlew installDebug
+
+  release:
+    desc: Produce a signed release AAB
+    cmds:
+      - ./gradlew bundleRelease
+
+  clean:
+    desc: Clean all build outputs
+    cmds:
+      - ./gradlew clean
+
+  api-app-info:
+    desc: Fetch the incumbent's live app info
+    cmds:
+      - 'curl -sf https://appy.fyi/api/app_info/{{.ORIGIN_PLAY_ID}} -H "Authorization: Bearer $APPY_API_KEY"'
+
+  api-reviews:
+    desc: Fetch a digest of the incumbent's latest reviews
+    cmds:
+      - 'curl -sf https://appy.fyi/api/reviews/{{.ORIGIN_PLAY_ID}} -H "Authorization: Bearer $APPY_API_KEY"'
+
+  api-photos:
+    desc: Fetch the incumbent's preview-screenshot CDN URLs
+    cmds:
+      - 'curl -sf https://appy.fyi/api/app_photos/{{.ORIGIN_PLAY_ID}} -H "Authorization: Bearer $APPY_API_KEY"'
+
+  api-build-spec:
+    desc: Re-fetch this app's own Tier A build spec
+    cmds:
+      - 'curl -sf https://appy.fyi/api/build_spec/{{.ORIGIN_PLAY_ID}} -H "Authorization: Bearer $APPY_API_KEY"'
+
+  api-ownerships:
+    desc: List this account's claimed apps
+    cmds:
+      - 'curl -sf https://appy.fyi/api/ownerships -H "Authorization: Bearer $APPY_API_KEY"'
+
+  api-profile:
+    desc: Show this account's claim quota (allowance/used/left)
+    cmds:
+      - 'curl -sf https://appy.fyi/api/profile -H "Authorization: Bearer $APPY_API_KEY"'
+
+  api-privacy-policy:
+    desc: Upload the drafted privacy policy (FILE=path to plain text, default privacy_policy.txt)
+    vars:
+      FILE: '{{.FILE | default "privacy_policy.txt"}}'
+    cmds:
+      - 'curl -sf -X POST https://appy.fyi/api/privacy_policy/{{.PACKAGE_ID}} -H "Authorization: Bearer $APPY_API_KEY" --data-binary @{{.FILE}}'
+
+  api-app-page:
+    desc: Publish/update this app's Google-Play-style page (NAME/DESC override the spec defaults)
+    vars:
+      NAME: '{{.NAME | default "<working_name from the spec>"}}'
+      DESC: '{{.DESC | default "<store_listing.long_description from the spec>"}}'
+    cmds:
+      - >-
+        curl -sf -X POST https://appy.fyi/api/app_page/{{.PACKAGE_ID}}
+        -H "Authorization: Bearer $APPY_API_KEY" -H "Content-Type: application/json"
+        -d "$(jq -n --arg name {{.NAME | quote}} --arg description {{.DESC | quote}} '{name:$name,description:$description}')"
+
+  api-app-page-icon:
+    desc: Upload this app's page icon (FILE=path, default the generated launcher icon)
+    vars:
+      FILE: '{{.FILE | default "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"}}'
+    cmds:
+      - 'curl -sf -X POST https://appy.fyi/api/app_page/{{.PACKAGE_ID}}/icon -H "Authorization: Bearer $APPY_API_KEY" -H "Content-Type: image/png" --data-binary @{{.FILE}}'
+
+  api-app-page-screenshot:
+    desc: Upload a screenshot to slot POSITION=1..5 (FILE=path, required)
+    cmds:
+      - 'curl -sf -X POST https://appy.fyi/api/app_page/{{.PACKAGE_ID}}/screenshot/{{.POSITION}} -H "Authorization: Bearer $APPY_API_KEY" -H "Content-Type: image/png" --data-binary @{{.FILE}}'
+```
+
+The Gradle task names above are the default shape — `build_instructions`
+(§0) is the literal, per-app source of truth, so if it names different
+Gradle tasks, use those instead in the `cmds` above rather than this generic
+set, so `task build`/`task test`/`task release` always run the exact
+commands this app's own spec actually specifies. The `api-*` tasks are the
+same ten endpoints documented in "Calling appy.fyi's API" above plus
+`ownerships`/`profile` (`commands/list.md`) — running them as plain `curl`
+via Task is deliberately faster and free (no agent invoked) compared to
+having an agent re-issue these same calls one at a time; `jq` is required
+only for `api-app-page` (JSON-body construction), never for the rest.
 
 ## 2. Data layer
 

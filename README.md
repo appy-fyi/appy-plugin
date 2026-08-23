@@ -24,16 +24,24 @@ Bundles:
   run it bare and it'll walk you through `/appy:list` first.
 - The `/appy:readme` command — (re)writes just this project's `README.md`
   from its build spec, on its own, without repeating any other build step.
+- The `/appy:init` command — backfills `Taskfile.yml` and/or `.env` into a
+  project that's missing either (predates them, or a fresh clone that
+  correctly gitignored `.env`), asking for your `APPY_API_KEY` if needed —
+  on its own, without repeating any other build step.
 - The `/appy:publish` command — walks the developer through the one-time
   Play Console/Cloud setup (if not already done) and then, via the Google
   Play Developer API itself, uploads the build to internal testing, pushes
   the store listing, and creates the billing product(s) — on its own,
   without repeating any other build step, so it also works to push a fresh
   build later after code changes.
-- The `appy` skill — scaffolds the Gradle/Compose project,
-  implements every screen/feature/data-model entity exactly as specified,
-  writes the test plan as real tests, writes a README.md (via `/appy:readme`
-  above) that names the incumbent app this is an alternative to and states
+- The `appy` skill — scaffolds the Gradle/Compose project, writes a
+  `Taskfile.yml` with named commands (`task build`/`test`/`install`/
+  `release`/`clean`) to manage it via the [Task](https://taskfile.dev)
+  runner plus dotenv-backed `task api-*` commands that call every appy.fyi
+  API endpoint directly via `curl` (no agent invocation needed), implements
+  every screen/feature/data-model entity exactly as specified, writes the
+  test plan as real tests, writes a README.md (via `/appy:readme` above)
+  that names the incumbent app this is an alternative to and states
   whether that incumbent is itself open source, wires in the Google Play
   In-App Review and Play Integrity client APIs, and — via `/appy:publish`
   above — uses the Google Play Developer API itself to upload the build to
@@ -76,9 +84,10 @@ Drop a `*-build-spec.json` file (downloaded from an appy.fyi report page)
 into your project instead and ask Claude Code to build it. Either way,
 `skills/appy/SKILL.md` is what actually builds the app, scoped to
 whichever subfolder it's handed. Once a project exists, `/appy:readme`
-regenerates just its `README.md` on its own, and `/appy:publish` walks
-through Play Console/Cloud setup and uploads the build to internal testing
-— both on their own, without repeating any other build step.
+regenerates just its `README.md` on its own, `/appy:publish` walks
+through Play Console/Cloud setup and uploads the build to internal testing,
+and `/appy:init` backfills `Taskfile.yml`/`.env` if either is missing —
+all three on their own, without repeating any other build step.
 
 ## License
 
