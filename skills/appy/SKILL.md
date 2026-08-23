@@ -21,16 +21,22 @@ fetched for you by this plugin's own `/appy:build` command. Read the whole
 file before doing anything else — don't start scaffolding off a partial
 read. If more than one matches, ask which.
 
-If this project root sits inside a shared multi-app folder (e.g.
-`~/apps/<package_id>/`, one subfolder per app, as `/appy:build` sets up —
-see `commands/build.md`), treat that subfolder as the entire filesystem for
-the rest of this skill: every file this skill writes (§1–§8) stays inside
-it. Never read, write, or otherwise touch a sibling app's subfolder, even to
-compare notes or reuse a dependency version, and never write anything
-directly into the shared apps root itself — that folder isn't a project,
-it's just a container. This holds whether you're running standalone or as
-one of several parallel per-app builds `/appy:build` launched at once; either
-way, this subfolder is the only context that exists, exactly like the "no
+If this project root sits inside a shared multi-app folder (e.g. `~/apps/`,
+one subfolder per app, as `/appy:build` sets up — see `commands/build.md`),
+treat that subfolder as the entire filesystem for the rest of this skill:
+every file this skill writes about *this app itself* (§2–§8, and this app's
+own `Taskfile.yml` — see §1) stays inside it. Never read, write, or
+otherwise touch a sibling app's subfolder, even to compare notes or reuse a
+dependency version. The one exception is the small set of files this app's
+build *shares* with every other app in the folder — `.env` (the
+`APPY_API_KEY`), the root `Taskfile.yml` (an aggregator — see §1), and
+`service-account.json` (the Play Developer API credential, once the
+developer has one — see `commands/publish.md`) — those live directly in the
+shared apps root itself, not duplicated per app, and this skill may create
+or update them there. Nothing else about this app belongs at the root. This
+holds whether you're running standalone or as one of several parallel
+per-app builds `/appy:build` launched at once; either way, this subfolder is
+the only *app-specific* context that exists, exactly like the "no
 relationship to appy.fyi" framing above.
 
 The incumbent's play_id is
@@ -165,17 +171,46 @@ Alongside the Gradle project, write a `Taskfile.yml` for the
 managing this app — building it, pushing it to a device, and calling every
 appy.fyi API endpoint below — is a short, memorable command instead of a raw
 Gradle/curl invocation someone has to look up or re-paste every time.
-`dotenv: ['.env']` loads `$APPY_API_KEY` for the `api-*` tasks from a
-`.env` file at the project root — this skill doesn't create that file itself
+
+Standalone (this project root is not inside a shared multi-app folder, §0):
+`dotenv: ['.env']` loads `$APPY_API_KEY` for the `api-*` tasks from a `.env`
+file at this same project root — this skill doesn't create that file itself
 (that's this plugin's `/appy:init` command), but if a `.gitignore` doesn't
-already exist, create one containing `.env` so a real key never accidentally
-gets committed; if `.gitignore` already exists and lacks a `.env` line, add
-one.
+already exist here, create one containing `.env` so a real key never
+accidentally gets committed; if `.gitignore` already exists and lacks a
+`.env` line, add one.
+
+Inside a shared multi-app folder (§0): `.env` is shared across every app in
+the folder, not duplicated per subfolder — one `APPY_API_KEY` per developer
+account, not one per app. Point `dotenv` at `['../.env']` instead of
+`['.env']` so this app's Taskfile reads the one `.env` sitting in the apps
+root. This skill still doesn't create that file itself (`/appy:init` does)
+— same `.gitignore` rule as above, except the `.gitignore` being
+checked/created is the one at the apps root, since that's where `.env` (and
+`service-account.json`, see `commands/publish.md`) actually live, not this
+subfolder. Also make sure the apps root has its own `Taskfile.yml` that
+`includes:` this app's, so its tasks are reachable as `task
+<package_id>:build` etc. straight from the root, not just from inside this
+subfolder:
 
 ```yaml
 version: '3'
 
-dotenv: ['.env']
+includes:
+  <package_id>:
+    taskfile: ./<package_id>/Taskfile.yml
+    dir: ./<package_id>
+```
+
+If the root `Taskfile.yml` doesn't exist yet, create it with just this
+`includes:` entry. If it already exists (a sibling app's build created it
+first), add this app's entry to its `includes:` map without touching any
+other app's entry already there.
+
+```yaml
+version: '3'
+
+dotenv: ['.env']  # ['../.env'] instead, inside a shared multi-app folder — see above
 
 vars:
   ORIGIN_PLAY_ID: <original_app.play_id from the spec, §0>
@@ -542,6 +577,7 @@ standing capability, not a buried implementation detail: `task build`,
 `task release`, and every `task api-*` command now work directly from a
 terminal in this project, with no further Claude Code turn needed for any
 of them. If `.env` doesn't exist yet (this skill never creates it — see
-§1), say so explicitly and point them at this plugin's `/appy:init`
-command to add it, since the `api-*` tasks need `APPY_API_KEY` there to
-work.
+§1) — at the apps root if this is a subfolder of a shared multi-app
+folder, otherwise this project's own root — say so explicitly and point
+them at this plugin's `/appy:init` command to add it, since the `api-*`
+tasks need `APPY_API_KEY` there to work.

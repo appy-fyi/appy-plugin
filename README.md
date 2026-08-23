@@ -14,7 +14,10 @@ produces.
 Designed to run from a shared apps folder (e.g. `~/apps`) as much as from a
 single project directory — `/appy:build` gives each app its own subfolder
 (named after its `package_id`) and can fetch and build several apps **in
-parallel**, one subfolder each, in a single call.
+parallel**, one subfolder each, in a single call. Inside a shared folder,
+`.env`, the aggregating `Taskfile.yml`, and `service-account.json` live once
+at the folder root rather than duplicated in every app's subfolder — see the
+`appy` skill's §1 and `/appy:publish` for the exact rules.
 
 Bundles:
 - The `/appy:list` command — lists the apps your appy.fyi account has

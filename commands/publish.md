@@ -77,9 +77,15 @@ skip whichever they confirm they've already done:
    Service Accounts → Create Service Account (no project-level IAM role is
    needed) → open it → Keys tab → Add Key → Create new key → JSON. This
    downloads a credentials file — treat it as a secret from the moment it
-   exists: never commit it, keep it outside this project's git tree (or add
-   its exact filename to `.gitignore` if that's not possible), and never
-   paste its contents into a file or message you might commit or log.
+   exists: never commit it, and never paste its contents into a file or
+   message you might commit or log. If this project is a subfolder of a
+   shared multi-app folder (§1), have the developer save it as
+   `service-account.json` at the *apps root*, not inside this subfolder —
+   one Google Cloud project/service account is normally reused across every
+   app the developer builds this way, not recreated per app — and make sure
+   the `.gitignore` at that root lists it (create one if it doesn't exist).
+   Standalone, keep it outside this project's git tree (or add its exact
+   filename to `.gitignore` if that's not possible).
 7. **Grant the service account Play Console permissions.** Back in Play
    Console → Setup → API access, find the new service account → "Manage
    Play Console permissions" → grant it release management for this app
@@ -87,7 +93,11 @@ skip whichever they confirm they've already done:
    API, product/order management too. An account Owner may need to approve
    this before it becomes active — if calls 403 later, this is the first
    thing to have the developer re-check.
-8. **Hand you the credentials.** The developer points you at the downloaded
+8. **Hand you the credentials.** If this project is a subfolder of a shared
+   multi-app folder, check the apps root for `service-account.json` first —
+   a previous app's publish flow may have already saved it there per step
+   2.6, in which case skip straight to step 3 without asking the developer
+   to repeat 2.1–2.7. Otherwise the developer points you at the downloaded
    JSON key — a file path, or an env var (e.g.
    `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`) holding one — and tells you to
    proceed. Until you have this, none of the steps below are possible, and
