@@ -5,8 +5,8 @@ description: List your appy.fyi claimed apps.
 Entry point for browsing what this appy.fyi account has already claimed.
 This command only lists — it can't claim anything new (that's a website-only
 action now, see step 3) and it doesn't fetch a build spec or build anything.
-Once you know which app you want, run this plugin's `/build <origin_play_id>`
-command next.
+Once you know which app you want, run this plugin's `/appy:build
+<origin_play_id>` command next.
 
 ## 1. Check for a key
 
@@ -33,13 +33,14 @@ note they can't be built from yet (the claim exists; appy.fyi hasn't
 generated a Tier A build spec for that incumbent). An empty array means
 nothing is claimed yet — go straight to step 3.
 
-Once the user has picked an `origin_play_id`, tell them to run `/build
-<origin_play_id>` to fetch its spec and build it — each app `/build` fetches
-gets its own subfolder (named after its `package_id`), so this is safe to run
-from a shared apps root that holds several apps at once. If more than one
-entry here has `build_spec_available: true` and the user wants more than one,
-they can pass several `origin_play_id`s to a single `/build` call and it'll
-build all of them in parallel, one subfolder each — see `commands/build.md`.
+Once the user has picked an `origin_play_id`, tell them to run `/appy:build
+<origin_play_id>` to fetch its spec and build it — each app `/appy:build`
+fetches gets its own subfolder (named after its `package_id`), so this is
+safe to run from a shared apps root that holds several apps at once. If more
+than one entry here has `build_spec_available: true` and the user wants more
+than one, they can pass several `origin_play_id`s to a single `/appy:build`
+call and it'll build all of them in parallel, one subfolder each — see
+`commands/build.md`.
 
 ## 3. Claiming a new app happens on the website, not here
 
@@ -50,9 +51,9 @@ the list above: they first need to find an app to clone by browsing
 signed in on that app's report page (`https://appy.fyi/report/<play_id>`),
 click the "Build this" button. That claims it (appy.fyi generates the new
 app's id itself — `fyi.appy.<app_name>.<username>`, no package-id choice to
-make) and shows the exact `/plugin`/`/build` commands to run next, the same
-ones this plugin's own README documents. An account can claim at most 2 apps
-total, ever, and a claim can never be undone — the website button already
-enforces both; there's nothing more to confirm here. Once they've clicked it,
-re-run this command (or just `/build <origin_play_id>` directly) — the new
-claim will show up.
+make) and shows the exact `/plugin`/`/appy:build` commands to run next, the
+same ones this plugin's own README documents. An account can claim at most 2
+apps total, ever, and a claim can never be undone — the website button
+already enforces both; there's nothing more to confirm here. Once they've
+clicked it, re-run this command (or just `/appy:build <origin_play_id>`
+directly) — the new claim will show up.

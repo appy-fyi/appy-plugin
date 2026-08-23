@@ -1,5 +1,5 @@
 ---
-name: build-from-spec
+name: appy
 description: Build a complete native Android app end-to-end from a self-contained build-spec.json (the format appy.fyi's /report/:play_id/build-spec.json download produces). Use when the user has dropped a *-build-spec.json file into this project and wants Claude Code to build the app it describes — scaffolds the Gradle/Compose project, implements every screen/feature/data-model entity exactly as specified, writes the test_plan as real tests, generates a deterministic launcher icon, writes a README.md disclosing the named incumbent app this is an alternative to (and whether that incumbent is itself open source), wires in the Google Play In-App Review and Play Integrity client APIs, and — once the developer has completed the one-time Play Console/Cloud setup this skill walks them through step by step — calls the Google Play Developer API itself to upload the build to internal testing and create the billing product(s). It still stops cleanly at the true human-only gates (trademark clearance, privacy-claim verification, Play Console account creation/content declarations, and promotion to production) instead of guessing past them.
 allowed-tools: Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/genLauncherIcon.ts *)
 ---
@@ -17,19 +17,19 @@ say so rather than inventing scope.
 
 Look for a single `*-build-spec.json` file in the project root (or wherever
 the user points you) — dropped in by hand from the website, or already
-fetched for you by this plugin's own `/build` command. Read the whole file
-before doing anything else — don't start scaffolding off a partial read. If
-more than one matches, ask which.
+fetched for you by this plugin's own `/appy:build` command. Read the whole
+file before doing anything else — don't start scaffolding off a partial
+read. If more than one matches, ask which.
 
 If this project root sits inside a shared multi-app folder (e.g.
-`~/apps/<package_id>/`, one subfolder per app, as `/build` sets up — see
-`commands/build.md`), treat that subfolder as the entire filesystem for the
-rest of this skill: every file this skill writes (§1–§8) stays inside it.
-Never read, write, or otherwise touch a sibling app's subfolder, even to
+`~/apps/<package_id>/`, one subfolder per app, as `/appy:build` sets up —
+see `commands/build.md`), treat that subfolder as the entire filesystem for
+the rest of this skill: every file this skill writes (§1–§8) stays inside
+it. Never read, write, or otherwise touch a sibling app's subfolder, even to
 compare notes or reuse a dependency version, and never write anything
 directly into the shared apps root itself — that folder isn't a project,
 it's just a container. This holds whether you're running standalone or as
-one of several parallel per-app builds `/build` launched at once; either
+one of several parallel per-app builds `/appy:build` launched at once; either
 way, this subfolder is the only context that exists, exactly like the "no
 relationship to appy.fyi" framing above.
 
@@ -236,7 +236,7 @@ tolerates its absence — never treat it as a build blocker.
 
 ## 6. README.md — disclose the incumbent
 
-Run this plugin's `/readme` command (see `commands/readme.md`) against the
+Run this plugin's `/appy:readme` command (see `commands/readme.md`) against the
 build-spec.json already read in §0 — it writes the project's `README.md`,
 naming and linking the incumbent (`original_app`), disclosing this is an
 independent alternative, and researching + stating whether that incumbent is
@@ -339,7 +339,7 @@ means:
 
 ### Google Play Developer API: manual setup, then automated publishing
 
-Run this plugin's `/publish` command (see `commands/publish.md`) against
+Run this plugin's `/appy:publish` command (see `commands/publish.md`) against
 the project just built — it walks the developer through the one-time Play
 Console/Cloud setup (Play Console account, app shell, content declarations,
 service account) exactly once, step by step, then uses the Google Play
@@ -397,10 +397,10 @@ what it concluded about the incumbent's open-source status, the screenshot
 gap from §5, which of §7's In-App Review / Play Integrity APIs got added
 (and why Integrity was skipped,
 if it was), and the open `human_gates_required[]` items from §8 as an
-explicit checklist — not a buried caveat. If §8's `/publish` command got as
-far as an internal-testing upload, state that plainly (track = internal,
+explicit checklist — not a buried caveat. If §8's `/appy:publish` command got
+as far as an internal-testing upload, state that plainly (track = internal,
 never further) along with the billing product ID if one was created; if the
-developer hasn't finished `/publish`'s one-time setup yet, list exactly
+developer hasn't finished `/appy:publish`'s one-time setup yet, list exactly
 which of its numbered steps remain instead of a generic "publishing is
 manual" note. If the privacy policy upload in §8 succeeded, include the
 `https://appy.fyi/privacy/<package_id>` confirmation link in that checklist too,

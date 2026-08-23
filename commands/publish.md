@@ -3,11 +3,11 @@ description: Walk the developer through the one-time Play Console/Cloud setup (i
 ---
 
 Standalone entry point for publishing an already-built project — the part
-of `build-from-spec`'s §8 that isn't a human-only gate. Useful on its own
+of `appy`'s §8 that isn't a human-only gate. Useful on its own
 when the developer wasn't ready with Play Console credentials during the
 original build (skip straight to step 2 once they are), or to push a fresh
 internal-testing build and/or store listing after later code changes,
-without re-running the whole build. The `build-from-spec` skill also runs
+without re-running the whole build. The `appy` skill also runs
 these exact steps itself, as its §8, during a full build.
 
 ## 1. Find and read the spec
@@ -18,14 +18,14 @@ draws on `working_name`, `package_id`, `store_listing`, `pricing`, and
 `human_gates_required[]`.
 
 If run from a shared multi-app folder (one subfolder per app, e.g.
-`~/apps/<package_id>/`, as `/build` sets up) rather than from inside a
+`~/apps/<package_id>/`, as `/appy:build` sets up) rather than from inside a
 single app's own project root, ask which app's subfolder to target instead
 of guessing — don't touch more than one app's release in a single run.
 
 Confirm a signed, buildable app actually exists in this project already
 (the output `build_instructions` produces) — this command publishes what's
 already built, it doesn't build anything itself. If nothing's been built
-yet, send the developer to `/build` or the `build-from-spec` skill first.
+yet, send the developer to `/appy:build` or the `appy` skill first.
 
 ## 2. One-time Play Console/Cloud setup
 

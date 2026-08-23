@@ -3,7 +3,7 @@
 // same icon — no model call, no external image-gen tool, no network access.
 // The glyph comes from the vendored Phosphor "regular" set (MIT licensed,
 // see assets/icons/phosphor-regular/), one <path> per icon on a 0 0 256 256
-// viewBox. Wired into .claude/skills/build-from-spec/SKILL.md §5.
+// viewBox. Wired into skills/appy/SKILL.md §5.
 
 const CANVAS = 108 // adaptive-icon dp/viewport size
 const SAFE_ZONE = 66 // Android's adaptive-icon safe-zone glyph diameter

@@ -1,5 +1,5 @@
 {
-  "name": "build-from-spec-plugin",
+  "name": "appy-plugin",
   "private": true,
   "optionalDependencies": {
     "sharp": "^0.35.3"

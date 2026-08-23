@@ -4,7 +4,7 @@ description: Fetch one or more claimed apps' build specs from appy.fyi and build
 
 Entry point for building an already-claimed app: fetches its build spec
 straight from the appy.fyi API — no manual browser download needed — then
-hands off into this plugin's `build-from-spec` skill exactly as if the file
+hands off into this plugin's `appy` skill exactly as if the file
 had been dropped in by hand.
 
 This command is multi-app-folder aware: run it from a shared apps root (e.g.
@@ -44,11 +44,11 @@ For each `origin_play_id` from step 2, independently:
 `GET https://appy.fyi/api/build_spec/<origin_play_id>`, header
 `Authorization: Bearer $APPY_API_KEY`. Responses:
 - `403 {"error": "not_owner"}` — this account hasn't actually claimed that
-  `origin_play_id` (run `/list` to check — if it's really not claimed, that
-  only happens on appy.fyi's website, see `commands/list.md` step 3) — don't
-  retry silently, surface this to the user.
+  `origin_play_id` (run `/appy:list` to check — if it's really not claimed,
+  that only happens on appy.fyi's website, see `commands/list.md` step 3) —
+  don't retry silently, surface this to the user.
 - `404` — no Tier A build spec exists yet for this incumbent (matches
-  `build_spec_available: false` in `/list`'s output).
+  `build_spec_available: false` in `/appy:list`'s output).
 - `200` — the build spec JSON itself, no wrapper.
 
 Read `package_id` out of the returned JSON — this app's own id, e.g.
@@ -69,23 +69,23 @@ to back (or concurrently) regardless of how step 4 ends up building them.
 
 ## 4. Build
 
-- **One app fetched:** hand off directly into this plugin's `build-from-spec`
+- **One app fetched:** hand off directly into this plugin's `appy`
   skill using the file just written in `./<package_id>/`, starting at its
   §0, with that subfolder as the project root.
 - **More than one app fetched:** build them at the same time rather than one
   after another. Launch one subagent per subfolder (Claude Code's Task
   tool), each given that subfolder as its working directory and instructed
-  to run this plugin's `build-from-spec` skill there, starting at its §0, on
+  to run this plugin's `appy` skill there, starting at its §0, on
   the `<origin_play_id>-build-spec.json` just fetched into it. Launch all of
   them in the same turn so they actually run concurrently, not queued
-  behind each other. Each subagent's build-from-spec run is fully
+  behind each other. Each subagent's appy skill run is fully
   self-contained to its own subfolder — see that skill's §0, which spells
   out never touching a sibling app's folder even when one is sitting right
   next to it. Once all subagents finish, report a combined summary: one
   block per app (its `package_id`, subfolder, and that build's own §10
   final report), not just the last one to finish.
 
-If a build's own §8/§10 shows the developer hadn't finished `/publish`'s
+If a build's own §8/§10 shows the developer hadn't finished `/appy:publish`'s
 one-time Play Console/Cloud setup yet, that's a normal stopping point, not a
-failure — say so and mention they can run `/publish` in that app's subfolder
-once they're ready, without repeating this build.
+failure — say so and mention they can run `/appy:publish` in that app's
+subfolder once they're ready, without repeating this build.

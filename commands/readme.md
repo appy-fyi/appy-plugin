@@ -5,7 +5,7 @@ description: Generate or refresh this project's README.md from its appy.fyi buil
 Standalone entry point for (re)writing this project's `README.md` from a
 `*-build-spec.json` already present in it — useful on its own if the README
 got deleted, needs refreshing after the spec changed, or you just want to
-regenerate it without repeating any other build step. The `build-from-spec`
+regenerate it without repeating any other build step. The `appy`
 skill also runs these exact steps itself, as its §6, during a full build.
 
 ## 1. Find and read the spec
@@ -16,7 +16,7 @@ file — this command draws on `working_name`, `positioning`, `original_app`,
 `features[]`, `min_sdk`, `build_instructions`, and `human_gates_required[]`.
 
 If run from a shared multi-app folder (one subfolder per app, e.g.
-`~/apps/<package_id>/`, as `/build` sets up) rather than from inside a
+`~/apps/<package_id>/`, as `/appy:build` sets up) rather than from inside a
 single app's own project root, ask which app's subfolder to target instead
 of guessing — don't scan every subfolder and don't touch more than one
 app's `README.md` in a single run.
@@ -36,7 +36,7 @@ in the project root that states this plainly, near the top:
   guess and don't leave it unstated. Search for `original_app.name` plus
   terms like "github", "source code", or "open source" (its Play Store
   listing description or developer website, if `GET /api/app_info/<play_id>`
-  — the `build-from-spec` skill's "Calling appy.fyi's API" — was reachable,
+  — the `appy` skill's "Calling appy.fyi's API" — was reachable,
   sometimes says so directly; otherwise a web search for the incumbent's own
   name is the next step). If you find a real public
   repository, name it and link it and say the incumbent is open source; if

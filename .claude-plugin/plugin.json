@@ -1,11 +1,11 @@
 {
-  "name": "build-from-spec-plugin",
-  "version": "4.1.0",
-  "description": "Build a complete native Android app end-to-end from a self-contained build-spec.json — claim an app on appy.fyi's website first (its report page's \"Build this\" button), then fetch it automatically with /list + /build (no manual download needed, no API claim step — this plugin can only read an already-claimed app), or drop the spec in by hand. Runs from a shared multi-app folder: /build gives each app its own subfolder and can build several apps in parallel in one call. Includes a /readme command for the disclosure README on its own, a /publish command that walks the developer through one-time Play Console/Cloud setup and then uploads builds to internal testing via the Google Play Developer API, a deterministic, always-present launcher icon, and Google Play In-App Review/Play Integrity client-API integration — no external image-gen tool required.",
+  "name": "appy",
+  "version": "5.0.0",
+  "description": "Build a complete native Android app end-to-end from a self-contained build-spec.json — claim an app on appy.fyi's website first (its report page's \"Build this\" button), then fetch it automatically with /appy:list + /appy:build (no manual download needed, no API claim step — this plugin can only read an already-claimed app), or drop the spec in by hand. Runs from a shared multi-app folder: /appy:build gives each app its own subfolder and can build several apps in parallel in one call. Includes a /appy:readme command for the disclosure README on its own, a /appy:publish command that walks the developer through one-time Play Console/Cloud setup and then uploads builds to internal testing via the Google Play Developer API, a deterministic, always-present launcher icon, and Google Play In-App Review/Play Integrity client-API integration — no external image-gen tool required.",
   "author": {
     "name": "Gilad Kutiel"
   },
-  "homepage": "https://github.com/appy-fyi/build-from-spec-plugin",
+  "homepage": "https://github.com/appy-fyi/appy-plugin",
   "license": "MIT",
   "keywords": ["android", "kotlin", "jetpack-compose", "app-builder", "icon-generation", "google-play-developer-api"]
 }
